@@ -675,3 +675,13 @@ footer.report {
   tbody tr { page-break-inside: avoid; }
   section.block { page-break-before: auto; }
 }
+
+/* Sub-headings inside a section, for a check that reports two distinct kinds
+ * of finding under one roof. */
+h3.gap-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.98rem;
+  margin: 1.4rem 0 0.15rem;
+}

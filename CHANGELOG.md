@@ -157,6 +157,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`ownership.object_naming` and an *Inventory gaps* section.** Where an
+  estate names its address objects after the account they belong to, that name
+  is a second, independent record of ownership — and where it disagrees with
+  the inventory, one of them is wrong. The disagreement was previously silent:
+  rules touching that network never reached the team's report, which then
+  looked complete.
+
+  Two disagreements are reported, in the cross-team overview and as a worksheet
+  in the combined workbook: a network the name assigns to a team the inventory
+  does not give it (usually the account's address group is missing a member),
+  and a network two teams' names both claim (a range reassigned while the older
+  object outlived it). On the estate this was built against, 50 objects of the
+  first kind across 18 accounts, and 7 of the second.
+
+  It never attributes a rule. A name is a claim; an address is what the
+  firewall matches on. This was built *instead of* reading ownership tags for
+  attribution, which would have made the same rules appear while leaving the
+  address groups wrong — for this tool and for everything else that uses them.
 - **`ownership.tag_suffixes`**, for estates that write the team before the
   marker: `payments-owner` alongside `owner:payments`. Empty by default,
   because a suffix is the rarer convention and a wrong one silently claims

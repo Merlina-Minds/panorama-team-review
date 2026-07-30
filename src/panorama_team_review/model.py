@@ -586,6 +586,28 @@ class Finding(BaseModel):
     teams: list[str] = Field(default_factory=list)
 
 
+class InventoryGap(BaseModel):
+    """A disagreement between the object names and the team inventory.
+
+    Where a naming convention states which account an address object belongs
+    to, that statement can be checked against what the inventory says the
+    account owns -- and where the two disagree, one of them is wrong. Both
+    kinds below were found on a real estate, and both are invisible in an
+    ordinary report: the rules touching those networks simply never reach the
+    team, and nothing says why.
+    """
+
+    kind: Literal["outside-team", "claimed-twice"]
+    team_id: str = Field(description="The team the object's name points at")
+    object_name: str
+    network: str
+    detail: str
+    other_team: str | None = Field(
+        default=None, description="For 'claimed-twice', the second team laying claim"
+    )
+    other_object: str | None = None
+
+
 class NamedObject(BaseModel):
     """An address object or group, with what it resolves to.
 
@@ -781,6 +803,12 @@ class ReportBundle(BaseModel):
         default_factory=list, description="Rules no team could be determined for"
     )
     global_findings: list[Finding] = Field(default_factory=list)
+    inventory_gaps: list[InventoryGap] = Field(
+        default_factory=list,
+        description="Where the object names and the team inventory disagree about who "
+        "owns a network. Addressed to whoever maintains the inventory, so it appears in "
+        "the cross-team overview rather than in a team's report.",
+    )
     stats: dict[str, int] = Field(default_factory=dict)
     hitcount_available: bool = False
     notes: list[str] = Field(default_factory=list)

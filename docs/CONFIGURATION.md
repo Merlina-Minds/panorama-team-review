@@ -347,6 +347,43 @@ does not.
 This is independent of `match_mode`, which decides whether a rule appears in
 the report at all.
 
+### `object_naming` — checking the inventory against the object names
+
+Where an estate names its address objects after the account they belong to,
+that name is a second, independent record of ownership. The inventory is the
+first. Where the two disagree, one of them is wrong — and the disagreement is
+otherwise silent: rules touching that network never reach the team's report,
+which then looks complete.
+
+```yaml
+ownership:
+  object_naming:
+    - pattern: '^net-prod-(?P<app>[a-z0-9]+)-'
+      team_id: "{app}-p"
+    - pattern: '^net-staging-(?P<app>[a-z0-9]+)-'
+      team_id: "{app}-t"
+```
+
+Same shape as `derive_teams`: a regex with named groups and a template that
+builds the team id. Write one rule per environment rather than one rule with a
+translation table — an estate whose `staging` networks belong to accounts ending
+in `-t` is exactly the case that has to be stated.
+
+Two disagreements are reported, in the *Inventory gaps* section of the
+cross-team overview and as a worksheet in the combined workbook:
+
+| | Meaning |
+|---|---|
+| **A network the name assigns to a team the inventory does not give it** | Usually the account's address group is missing a member. Every rule touching that network is absent from the team's report until it is added. |
+| **A network two teams' names both claim** | Either the range was reassigned and the older object outlived it, or both describe the same addresses. A rule touching it is attributed to both, and neither attribution is the more trustworthy. |
+
+An object whose name points at a team that does not exist is *not* reported
+here — that is an account missing from the inventory entirely, and the
+`show_unassigned_section` list already speaks to it.
+
+This never attributes a rule. A name is a claim; an address is what the
+firewall matches on.
+
 ### `include_any_rules`
 
 A rule with `any` on **both** sides affects every team. They are reported as

@@ -28,6 +28,7 @@
       <a href="#s-teams">Teams</a>
       {% if bundle.scopes %}<a href="#s-scopes">Policy blocks</a>{% endif %}
       {% if bundle.unassigned %}<a href="#s-unassigned">Rules without an owner</a>{% endif %}
+      {% if bundle.inventory_gaps %}<a href="#s-gaps">Inventory gaps</a>{% endif %}
       {% if bundle.global_findings %}<a href="#s-findings">All findings</a>{% endif %}
       <a href="#s-stats">Statistics</a>
     </nav>
@@ -177,6 +178,71 @@
       </div>
       {% if bundle.unassigned | length > 400 %}
       <p class="lede" style="margin-top:0.5rem">Showing the first 400 of {{ bundle.unassigned | length }}. The complete list is in the JSON output.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if bundle.inventory_gaps %}
+  {% set outside = bundle.inventory_gaps | selectattr("kind", "equalto", "outside-team") | list %}
+  {% set twice = bundle.inventory_gaps | selectattr("kind", "equalto", "claimed-twice") | list %}
+  <section class="block" id="s-gaps">
+    {{ m.section_heading("Inventory gaps", bundle.inventory_gaps | length, "gaps") }}
+    <div class="collapsible" data-body="gaps">
+      <p class="lede">
+        Where the object names and the team inventory disagree about who owns a network. The
+        names are a second, independent record of ownership, so a disagreement means one of the
+        two is wrong — and the effect is silent: rules touching those networks never reach the
+        team's report, which then looks complete. Nothing here is a firewall problem; it is an
+        inventory one, and fixing it is what makes the affected reports correct.
+      </p>
+
+      {% if outside %}
+      <h3 class="gap-head">A network the name assigns to a team the inventory does not give it
+        <span class="count-badge">{{ outside | length }}</span></h3>
+      <p class="lede">
+        Usually the team's address group is missing a member. Every rule touching the network is
+        absent from that team's report until it is added.
+      </p>
+      <div class="table-scroll{{ ' capped' if outside | length > 12 }}">
+        <table>
+          <thead><tr><th>Team</th><th>Object</th><th>Network</th><th>The team's networks</th></tr></thead>
+          <tbody>
+          {% for gap in outside %}
+            <tr>
+              <td class="name">{{ gap.team_id }}</td>
+              <td class="mono">{{ gap.object_name }}</td>
+              <td class="addr">{{ gap.network }}</td>
+              <td class="addr">{{ gap.detail.split(" holds ")[1].split(" -- ")[0] }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if twice %}
+      <h3 class="gap-head">A network two teams' names both claim
+        <span class="count-badge">{{ twice | length }}</span></h3>
+      <p class="lede">
+        Either the range was reassigned and the older object outlived it, or both describe the
+        same addresses. A rule touching it is attributed to both teams, and neither attribution
+        is the more trustworthy.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Network</th><th>Claimed by</th><th>and by</th></tr></thead>
+          <tbody>
+          {% for gap in twice %}
+            <tr>
+              <td class="addr">{{ gap.network }}</td>
+              <td><span class="pill">{{ gap.team_id }}</span><br><span class="mono">{{ gap.object_name }}</span></td>
+              <td><span class="pill">{{ gap.other_team }}</span><br><span class="mono">{{ gap.other_object }}</span></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
       {% endif %}
     </div>
   </section>

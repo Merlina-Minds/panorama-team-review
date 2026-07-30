@@ -487,3 +487,149 @@ def test_the_finding_names_the_editor_and_the_date():
     finding = next(f for fs in found.values() for f in fs if f.code == "IMPOSSIBLE_DATE")
     assert "a.beck" in finding.detail
     assert "2027-07-18" in finding.detail
+
+
+# ---------------------------------------------------------------------------
+# Where the object names and the inventory disagree
+# ---------------------------------------------------------------------------
+
+
+def _gaps(objects, teams, patterns):
+    """objects: [(name, cidr)], teams: {id: [cidr]}, patterns: [(regex, team_id)]."""
+    from datetime import datetime
+
+    from panorama_team_review.analyze.inventory_gaps import find_inventory_gaps
+    from panorama_team_review.config import ObjectNamingRule
+    from panorama_team_review.model import (
+        AddressKind,
+        AddressObject,
+        Location,
+        Snapshot,
+        SnapshotMeta,
+        Team,
+    )
+
+    location = Location(source="t.xml")
+    snapshot = Snapshot(
+        meta=SnapshotMeta(source_file="t.xml", parsed_at=datetime(2026, 7, 28)),
+        addresses=[
+            AddressObject(name=name, kind=AddressKind.IP_NETMASK, value=cidr, location=location)
+            for name, cidr in objects
+        ],
+    )
+    return find_inventory_gaps(
+        snapshot,
+        [Team(id=tid, name=tid, assets=assets) for tid, assets in teams.items()],
+        [ObjectNamingRule(pattern=p, team_id=t) for p, t in patterns],
+    )
+
+
+PROD = (r"^net-prod-(?P<app>[a-z0-9]+)-", "{app}-p")
+
+
+def test_an_object_outside_its_teams_networks_is_reported():
+    """The case that made a team's report look complete while missing nine rules."""
+    gaps = _gaps(
+        objects=[("net-prod-payments-database-10.20.99.0-24", "10.20.99.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+    )
+    assert len(gaps) == 1
+    assert gaps[0].kind == "outside-team"
+    assert gaps[0].team_id == "payments-p"
+    assert gaps[0].network == "10.20.99.0/24"
+    assert "10.20.12.0/22" in gaps[0].detail
+
+
+def test_an_object_inside_its_teams_networks_is_not_reported():
+    gaps = _gaps(
+        objects=[("net-prod-payments-database-10.20.12.0-24", "10.20.12.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+    )
+    assert gaps == []
+
+
+def test_a_network_two_teams_claim_is_reported():
+    gaps = _gaps(
+        objects=[
+            ("net-prod-payments-database-10.20.12.0-24", "10.20.12.0/24"),
+            ("net-prod-orders-frontend-10.20.12.0-24", "10.20.12.0/24"),
+        ],
+        teams={"payments-p": ["10.20.12.0/22"], "orders-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+    )
+    contested = [g for g in gaps if g.kind == "claimed-twice"]
+    assert len(contested) == 1
+    assert {contested[0].team_id, contested[0].other_team} == {"payments-p", "orders-p"}
+
+
+def test_a_name_pointing_at_an_unknown_team_is_not_reported():
+    """That is an account missing from the inventory entirely, which the
+    unassigned-rules section already speaks to. Reporting it twice would
+    double-count one gap."""
+    gaps = _gaps(
+        objects=[("net-prod-newapp-database-10.20.99.0-24", "10.20.99.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+    )
+    assert gaps == []
+
+
+def test_no_naming_convention_means_no_gaps():
+    """A convention only exists where an estate has one; guessing invents findings."""
+    gaps = _gaps(
+        objects=[("net-prod-payments-database-10.20.99.0-24", "10.20.99.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[],
+    )
+    assert gaps == []
+
+
+def test_the_stage_mapping_has_to_be_written_down():
+    """An estate whose 'staging' networks belong to '-t' accounts states it."""
+    gaps = _gaps(
+        objects=[("net-staging-payments-db-10.30.9.0-24", "10.30.9.0/24")],
+        teams={"payments-t": ["10.30.0.0/22"]},
+        patterns=[(r"^net-staging-(?P<app>[a-z0-9]+)-", "{app}-t")],
+    )
+    assert len(gaps) == 1 and gaps[0].team_id == "payments-t"
+
+
+def test_an_object_defined_in_two_scopes_is_reported_once():
+    """A merged Panorama archive holds each definition separately.
+
+    That distinction matters to the resolver and to nobody reading this list:
+    one gap is one address group to correct, however many places the object is
+    written down in.
+    """
+    from datetime import datetime
+
+    from panorama_team_review.analyze.inventory_gaps import find_inventory_gaps
+    from panorama_team_review.config import ObjectNamingRule
+    from panorama_team_review.model import (
+        AddressKind,
+        AddressObject,
+        Location,
+        Snapshot,
+        SnapshotMeta,
+        Team,
+    )
+
+    def address(scope):
+        return AddressObject(
+            name="net-prod-payments-database-10.20.99.0-24",
+            kind=AddressKind.IP_NETMASK, value="10.20.99.0/24",
+            location=Location(source="t.xml", device_group=scope),
+        )
+
+    snapshot = Snapshot(
+        meta=SnapshotMeta(source_file="t.xml", parsed_at=datetime(2026, 7, 28)),
+        addresses=[address("DG-Production"), address(None)],
+    )
+    gaps = find_inventory_gaps(
+        snapshot,
+        [Team(id="payments-p", name="Payments", assets=["10.20.12.0/22"])],
+        [ObjectNamingRule(pattern=r"^net-prod-(?P<app>[a-z0-9]+)-", team_id="{app}-p")],
+    )
+    assert len(gaps) == 1

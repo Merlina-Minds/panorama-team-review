@@ -35,6 +35,19 @@ the most valuable issues to open.
    See [docs/PRIVACY.md](docs/PRIVACY.md) — this is enforced by a pre-commit
    hook and a CI job, not by trust.
 
+   **The hook cannot see the case that actually happens.** It catches routable
+   addresses, serials, hostnames and secrets. What it cannot catch is a real
+   object name, ticket id, administrator or naming convention quoted in a
+   *comment* — and that is precisely what a good explanation reaches for, since
+   the bug being explained came from a real estate. `net_aws_prod_orders-db-…`
+   and `CHG0041234 (a.beck: 2024-05-30)` are indistinguishable to a regex, and
+   only one of them is safe.
+
+   So: every example in a comment, docstring, test or document comes from the
+   invented estate — the teams, networks, object names, tickets and people that
+   `tests/fixtures/generator.py` and `example/` already use. Describe the shape
+   of what you found; use their vocabulary to say it.
+
 2. **A check that cannot be sure stays silent.** The tool's value rests on
    system owners believing what it tells them. One rule wrongly flagged as
    unused teaches a team to ignore the whole report. Where the data to decide
@@ -89,6 +102,7 @@ backup file
     │  resolve/ownership.py rules → teams, with direction and coverage
     │  resolve/evaluation.py where a rule sits in the evaluation order
     │  analyze/findings.py  cleanup checks
+    │  analyze/inventory_gaps.py  object names vs. the inventory
     ▼
   ReportBundle              report/build.py
     │
@@ -126,6 +140,7 @@ four times is four chances to derive it differently.
 | `enrich/metadata.py` | Tickets, dates and requesters from free text |
 | `enrich/hitcount.py` | Optional hit-count collection |
 | `analyze/findings.py` | The cleanup checks |
+| `analyze/inventory_gaps.py` | Object names checked against the inventory: who owns which network |
 | `report/` | Assembly and the four renderers |
 | `privacy/scrub.py` | Pseudonymiser for bug reports |
 | `tools/check_no_customer_data.py` | The repository data guard |

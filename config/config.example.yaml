@@ -145,6 +145,22 @@ ownership:
   # 9 keeps a rule naming the /24 a /32 asset lives in counted as that team's.
   covering_supernet_bits: 1
 
+  # Where object names state which account they belong to, the tool can check
+  # the inventory against them. It never uses a name to attribute a rule --
+  # addresses do that, and better -- but where a name says one account owns a
+  # network and the inventory says another does, or nobody does, one of the two
+  # is wrong. The effect is silent: rules touching that network never reach the
+  # team's report, which then looks complete.
+  #
+  # Empty by default: a convention only exists where an estate has one.
+  object_naming: []
+  # Example -- one rule per environment, because a 'staging' network belonging
+  # to an account whose id ends in '-t' has to be stated, not inferred:
+  #   - pattern: '^net-prod-(?P<app>[a-z0-9]+)-'
+  #     team_id: "{app}-p"
+  #   - pattern: '^net-staging-(?P<app>[a-z0-9]+)-'
+  #     team_id: "{app}-t"
+
   # Rules with 'any' on BOTH sides affect everyone. Showing them to every team
   # is honest but noisy, so they are capped per team. They are always reported
   # as covering a team, never as its own.

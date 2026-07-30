@@ -179,6 +179,7 @@ def write_combined_workbook(bundle: ReportBundle, path: Path, config: Config) ->
         )
 
     _write_findings_sheet(book, formats, bundle.global_findings, include_teams=True)
+    _write_inventory_gaps_sheet(book, formats, bundle)
     _write_stats_sheet(book, formats, bundle)
 
     book.close()
@@ -588,6 +589,38 @@ def _count_by_asset(views: list[RuleView]) -> dict[str, int]:
         for asset in view.matched_assets:
             counts[asset] = counts.get(asset, 0) + 1
     return counts
+
+
+def _write_inventory_gaps_sheet(
+    book: xlsxwriter.Workbook, formats: _Formats, bundle: ReportBundle
+) -> None:
+    """Where the object names and the inventory disagree about who owns a network.
+
+    A worklist rather than a report: each row is one address group to correct,
+    and correcting it is what makes the affected team's rules appear.
+    """
+    if not bundle.inventory_gaps:
+        return
+
+    sheet = book.add_worksheet("Inventory gaps")
+    columns = [
+        ("Kind", 16), ("Team", 22), ("Object", 46), ("Network", 20),
+        ("Also claimed by", 22), ("Their object", 46), ("What it means", 70),
+    ]
+    for index, (header, width) in enumerate(columns):
+        sheet.set_column(index, index, width)
+        sheet.write(0, index, header, formats.header)
+    sheet.set_row(0, 30)
+    sheet.freeze_panes(1, 0)
+    sheet.autofilter(0, 0, len(bundle.inventory_gaps), len(columns) - 1)
+
+    for row, gap in enumerate(bundle.inventory_gaps, start=1):
+        values = [
+            gap.kind, gap.team_id, gap.object_name, gap.network,
+            gap.other_team or "", gap.other_object or "", gap.detail,
+        ]
+        for column, value in enumerate(values):
+            sheet.write(row, column, value, formats.cell)
 
 
 def _write_stats_sheet(book: xlsxwriter.Workbook, formats: _Formats, bundle: ReportBundle) -> None:

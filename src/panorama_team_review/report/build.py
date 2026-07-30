@@ -17,6 +17,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime
 
 from ..analyze.findings import rule_key, run_checks, unknown_checks
+from ..analyze.inventory_gaps import find_inventory_gaps
 from ..config import Config
 from ..enrich.metadata import MetadataExtractor, annotate_rules
 from ..model import (
@@ -102,6 +103,7 @@ def build_report(
         teams=team_reports,
         unassigned=unassigned,
         global_findings=_global_findings(findings_by_rule),
+        inventory_gaps=find_inventory_gaps(snapshot, teams, config.ownership.object_naming),
         stats=_build_stats(snapshot, rules, team_reports, unassigned, findings_by_rule),
         hitcount_available=any(rule.hits is not None for rule in snapshot.rules),
         notes=notes,

@@ -681,6 +681,16 @@ footer.report {
   tbody tr { page-break-inside: avoid; }
   section.block { page-break-before: auto; }
 }
+
+/* Sub-headings inside a section, for a check that reports two distinct kinds
+ * of finding under one roof. */
+h3.gap-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.98rem;
+  margin: 1.4rem 0 0.15rem;
+}
 </style>
 </head>
 <body>
@@ -693,7 +703,7 @@ footer.report {
     <div class="subject">Payments Platform · payments@example.com</div>
     <div class="provenance">
       <span><b>Configuration:</b> example-estate.xml</span>
-<span><b>Backup from:</b> 2026-07-30 18:33</span>      <span><b>Report generated:</b> 2026-07-30 18:33</span>
+<span><b>Backup from:</b> 2026-07-30 19:26</span>      <span><b>Report generated:</b> 2026-07-30 19:26</span>
       <span><b>Tool:</b> panorama-team-review 0.1.0</span>
     </div>
 

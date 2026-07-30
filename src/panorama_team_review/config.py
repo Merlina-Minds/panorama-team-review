@@ -259,6 +259,51 @@ class DerivedTeamRule(ConfigModel):
         return self
 
 
+class ObjectNamingRule(ConfigModel):
+    """An object name that states which team the object belongs to.
+
+    Not used to attribute rules -- addresses do that, and better. Used to
+    *check* the inventory: where a name says which account a network belongs to
+    and the inventory says that network belongs to nobody, or to somebody else,
+    one of the two is wrong. The disagreement is otherwise silent -- the rules
+    touching that network simply never reach the team's report, which then
+    looks complete.
+
+    Same shape as ``derive_teams``: a regex with named groups, and a template
+    that builds the team id from them. Write one rule per environment rather
+    than one rule with a translation table. An estate whose ``staging``
+    networks belong to accounts whose id ends in ``-t`` is exactly the case
+    that has to be stated rather than inferred:
+
+        object_naming:
+          - pattern: '^net-prod-(?P<app>[a-z0-9]+)-'
+            team_id: "{app}-p"
+          - pattern: '^net-staging-(?P<app>[a-z0-9]+)-'
+            team_id: "{app}-t"
+    """
+
+    pattern: str = Field(description="Regex with at least one named group")
+    team_id: str = Field(description="Template for the team id, e.g. '{app}-p'")
+
+    @model_validator(mode="after")
+    def _check(self) -> ObjectNamingRule:
+        try:
+            compiled = re.compile(self.pattern)
+        except re.error as exc:
+            raise ValueError(f"object_naming: invalid regex {self.pattern!r}: {exc}") from exc
+
+        groups = set(compiled.groupindex)
+        missing = [key for key in re.findall(r"\{(\w+)\}", self.team_id) if key not in groups]
+        if missing:
+            raise ValueError(
+                f"object_naming: team_id references {missing}, which the pattern does not "
+                f"capture (it captures {sorted(groups)})"
+            )
+        if not self.team_id.strip():
+            raise ValueError("object_naming: team_id must not be empty")
+        return self
+
+
 class OwnershipConfig(ConfigModel):
     """How rules are attributed to teams.
 
@@ -335,6 +380,14 @@ class OwnershipConfig(ConfigModel):
     )
     max_any_rules_per_team: int = Field(
         default=50, description="Cap on 'any' rules per team so the report stays readable"
+    )
+
+    object_naming: list[ObjectNamingRule] = Field(
+        default_factory=list,
+        description="Object names that state which team they belong to, used to check the "
+        "inventory rather than to attribute rules. Empty by default: a convention only "
+        "exists where an estate has one, and guessing at object names would invent "
+        "findings.",
     )
 
     derive_teams: list[DerivedTeamRule] = Field(
