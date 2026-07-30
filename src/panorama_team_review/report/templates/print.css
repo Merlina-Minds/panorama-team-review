@@ -1,0 +1,274 @@
+/* Print stylesheet for the PDF renderer (WeasyPrint).
+ *
+ * The PDF is the audit and sign-off artefact: a frozen record of what the
+ * policy looked like on a given day.  It deliberately carries fewer columns
+ * than the HTML report -- the interactive version and the workbook are where
+ * detail work happens, and a 12-column table on A4 is unreadable.
+ *
+ * Landscape, because firewall rules are wide.
+ */
+
+@page {
+  size: A4 landscape;
+  margin: 14mm 12mm 16mm;
+
+  @top-left {
+    content: string(report-title);
+    font-size: 8pt;
+    color: #666;
+  }
+  @top-right {
+    content: string(report-subject);
+    font-size: 8pt;
+    color: #666;
+  }
+  @bottom-left {
+    content: string(report-provenance);
+    font-size: 7.5pt;
+    color: #888;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-size: 7.5pt;
+    color: #888;
+  }
+}
+
+@page :first {
+  @top-left { content: ""; }
+  @top-right { content: ""; }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "DejaVu Sans", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 8.5pt;
+  line-height: 1.35;
+  color: #111;
+  margin: 0;
+}
+
+h1 {
+  string-set: report-title content();
+  font-size: 20pt;
+  margin: 0 0 2mm;
+  color: #1f3864;
+}
+
+.subject {
+  string-set: report-subject content();
+  font-size: 12pt;
+  margin-bottom: 3mm;
+  color: #333;
+}
+
+.provenance-line {
+  string-set: report-provenance content();
+  font-size: 7.5pt;
+  color: #666;
+  margin-bottom: 6mm;
+}
+
+/* --- title page --------------------------------------------------------- */
+
+/* The cover must fit on exactly one page. Everything on it is sized so that a
+ * team with the longest plausible metadata still fits; if it ever overflows,
+ * the break lands mid-explainer and looks like a bug. */
+.cover { page-break-after: always; }
+
+.cover-meta {
+  margin-top: 5mm;
+  border-top: 0.5pt solid #ccc;
+  border-bottom: 0.5pt solid #ccc;
+  padding: 2mm 0;
+}
+
+.cover-meta table { width: 100%; border: none; }
+.cover-meta td { border: none; padding: 0.7mm 0; vertical-align: top; }
+.cover-meta td.key { width: 45mm; color: #666; }
+.cover-meta tr:nth-child(even) td { background: transparent; }
+
+.summary-grid {
+  display: table;
+  width: 100%;
+  margin: 4mm 0;
+  border-spacing: 2mm 0;
+}
+
+.summary-cell {
+  display: table-cell;
+  border: 0.5pt solid #ccc;
+  border-radius: 2pt;
+  padding: 2.5mm;
+  text-align: center;
+  width: 20%;
+}
+
+.summary-cell .value { font-size: 16pt; font-weight: bold; color: #1f3864; }
+.summary-cell .label { font-size: 7pt; color: #666; text-transform: uppercase; letter-spacing: 0.3pt; }
+
+.explainer { margin: 4mm 0; }
+.explainer ul { margin: 1.5mm 0 0; padding-left: 5mm; }
+.explainer li { margin-bottom: 0.8mm; }
+
+.note {
+  border-left: 2pt solid #fab219;
+  background: #fdf8ec;
+  padding: 2mm 3mm;
+  margin: 3mm 0;
+  font-size: 7.5pt;
+}
+
+/* --- sections ----------------------------------------------------------- */
+
+section { page-break-before: always; }
+section.first { page-break-before: avoid; }
+
+h2 {
+  font-size: 12pt;
+  color: #1f3864;
+  margin: 0 0 1mm;
+  border-bottom: 0.5pt solid #1f3864;
+  padding-bottom: 1mm;
+}
+
+.lede { color: #555; font-size: 8pt; margin: 0 0 3mm; }
+
+/* The report is split into two parts that ask different things of the reader.
+ * Each opens its own page so the boundary cannot be missed while flipping
+ * through -- a reader who takes the estate-wide rules for a review request has
+ * been handed work that is not theirs. */
+section.part {
+  page-break-before: always;
+  page-break-after: avoid;
+}
+
+/* Sections break onto a new page by default, which would leave the part
+ * heading alone on one with nothing under it. The first section after a part
+ * heading stays with it. */
+section.part + section { page-break-before: avoid; }
+
+.part-title {
+  font-size: 16pt;
+  font-weight: bold;
+  color: #1f3864;
+  border-bottom: 1.5pt solid #1f3864;
+  padding-bottom: 1.5mm;
+  margin-bottom: 1.5mm;
+}
+
+/* Rule blocks, in the order the firewall evaluates them. */
+tr.scope-row td {
+  background: #eef2f9;
+  border-top: 0.8pt solid #1f3864;
+  border-bottom: 0.4pt solid #1f3864;
+  font-size: 7pt;
+  color: #333;
+}
+
+tr.scope-row:nth-child(even) td { background: #eef2f9; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 7.5pt;
+  table-layout: fixed;
+}
+
+thead { display: table-header-group; }
+
+th {
+  background: #1f3864;
+  color: #fff;
+  text-align: left;
+  padding: 1.5mm 1.5mm;
+  font-size: 7pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.2pt;
+}
+
+td {
+  padding: 1.2mm 1.5mm;
+  border-bottom: 0.4pt solid #ddd;
+  vertical-align: top;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+tr { page-break-inside: avoid; }
+tr.disabled td { color: #888; font-style: italic; }
+tr:nth-child(even) td { background: #f7f7f5; }
+
+td.mono, .mono {
+  font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace;
+  font-size: 6.8pt;
+}
+
+/* Severity is carried by a letter and a word as well as a tint, so the PDF
+ * stays readable when printed in greyscale. */
+.sev {
+  display: inline-block;
+  padding: 0.3mm 1.2mm;
+  border-radius: 1.5pt;
+  font-size: 6.5pt;
+  font-weight: bold;
+  border: 0.4pt solid;
+  white-space: nowrap;
+}
+
+.sev-high   { background: #f8dede; border-color: #d03b3b; color: #7a1414; }
+.sev-medium { background: #fce6da; border-color: #ec835a; color: #8a3a12; }
+.sev-low    { background: #fdf1d5; border-color: #fab219; color: #7a5a00; }
+.sev-info   { background: #f0f0ee; border-color: #aaa; color: #444; }
+
+.dir {
+  display: inline-block;
+  font-size: 6.5pt;
+  border: 0.4pt solid #999;
+  border-radius: 1.5pt;
+  padding: 0.3mm 1.2mm;
+  white-space: nowrap;
+}
+
+/* A rule that blocks traffic must not read like one that permits it, in print
+ * least of all -- a PDF gets skimmed, and nothing is clickable. */
+.blocked {
+  display: inline-block;
+  border: 0.5pt solid #d03b3b;
+  background: #f8dede;
+  color: #7a1414;
+  border-radius: 1.5pt;
+  padding: 0.2mm 1mm;
+  font-size: 6.5pt;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.tag {
+  display: inline-block;
+  border: 0.4pt solid #bbb;
+  border-radius: 1.5pt;
+  padding: 0.2mm 1mm;
+  font-size: 6.5pt;
+  color: #444;
+}
+
+a { color: #0563c1; text-decoration: none; }
+
+.empty {
+  border: 0.5pt dashed #bbb;
+  padding: 4mm;
+  text-align: center;
+  color: #777;
+  font-size: 8pt;
+}
+
+footer {
+  margin-top: 6mm;
+  padding-top: 2mm;
+  border-top: 0.4pt solid #ccc;
+  font-size: 7pt;
+  color: #777;
+}

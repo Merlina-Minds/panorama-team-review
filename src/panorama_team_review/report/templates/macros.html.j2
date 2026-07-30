@@ -1,0 +1,330 @@
+{# Shared rendering macros for the interactive and print report templates. #}
+
+{% macro severity_badge(severity) %}
+{%- set icons = {"high": "▲", "medium": "◆", "low": "●", "info": "○"} -%}
+{%- set words = {"high": "High", "medium": "Medium", "low": "Low", "info": "Info"} -%}
+<span class="badge sev-{{ severity }}"><span class="icon" aria-hidden="true">{{ icons[severity] }}</span>{{ words[severity] }}</span>
+{%- endmacro %}
+
+{% macro direction_badge(direction) %}
+{#- Colour never carries direction on its own: each badge shows an arrow and the word.
+    "Internal" is spelled out, because in a firewall report it reads as "the internal
+    network" rather than as what it means: both ends of this rule belong to you. -#}
+{%- set icons = {"inbound": "↓", "outbound": "↑", "internal": "⇄", "related": "•"} -%}
+{%- set words = {"inbound": "Inbound", "outbound": "Outbound", "internal": "Both ends yours", "related": "No direction"} -%}
+<span class="badge dir-{{ direction }}"><span class="icon" aria-hidden="true">{{ icons[direction] }}</span>{{ words[direction] }}</span>
+{%- endmacro %}
+
+{% macro action_badge(action) %}
+{#- Deny, drop and the resets all mean "this traffic does not pass". The word
+    alone is not enough at a glance in a table of three hundred rows. -#}
+<span class="badge action-block"><span class="icon" aria-hidden="true">⊘</span>{{ action }}</span>
+{%- endmacro %}
+
+{% macro tickets(rule) %}
+{%- for ticket in rule.metadata.tickets -%}
+{%- if ticket.url %}<a class="ticket" href="{{ ticket.url }}" rel="noopener">{{ ticket.id }}</a>{% else %}<span class="pill mono">{{ ticket.id }}</span>{% endif %}{{ " " if not loop.last }}
+{%- endfor -%}
+{% endmacro %}
+
+{#
+  A rule row.
+
+  `show_findings` is off for the rules that merely cover a team. Those rules
+  are maintained centrally, so a severity badge on one is an alarm the reader
+  cannot act on -- and, worse, one that competes for attention with the badges
+  on the rules that are theirs.
+#}
+{% macro rule_row(view, index, columns, show_findings=true, show_direction=false, show_usage=true, show_team=false, team_name="", labels={}, peers_first=false) %}
+{%- set rule = view.rule -%}
+{%- set worst = view | worst_severity -%}
+<tr class="rule-row{{ ' disabled' if rule.disabled }}"
+    data-index="{{ index }}"
+    data-severity="{{ worst.value if worst and show_findings else 'none' }}"
+    data-scope="{{ view.scope_id }}"
+    data-direction="{{ view.direction }}"
+    data-search="{{ view | search_text | e }}">
+  {% if show_team %}<td>{{ team_name }}</td>{% endif %}
+  <td class="num pos" title="Position within {{ view.scope_id }}">{{ rule.order + 1 }}</td>
+  {% if show_direction %}<td>{{ direction_badge(view.direction) }}</td>{% endif %}
+  <td class="name">
+    {{ rule.name }}
+    {%- if rule.disabled %} <span class="pill">disabled</span>{% endif %}
+    {#- A rule that blocks traffic reads exactly like one that permits it
+        unless the difference is stated loudly. Somebody scanning for "may I
+        reach X" must not mistake a deny for a yes. -#}
+    {%- if not rule.action.permits_traffic %} {{ action_badge(rule.action.value) }}{% endif %}
+  </td>
+  {#- The two address columns swap so the row reads in the direction the
+      traffic travels: inbound puts the far side first and yours on the right,
+      outbound the other way round. Reading "who reaches you" right-to-left is
+      a small thing that costs attention on every single row. -#}
+  {% set own_cell %}<td class="objs">{{ view | asset_cells(labels) }}</td>{% endset %}
+  {% set peer_cell %}<td class="objs">{{ view | peer_cells }}
+    {#- Owners of the far side. Once there are more than a few, the count is
+        the useful statement and the names go in the tooltip. -#}
+    {%- if view.peer_teams %}<br><span class="pill">{{ view | peer_team_cell }}</span>{% endif %}
+  </td>{% endset %}
+  {{ peer_cell if peers_first else own_cell }}{{ own_cell if peers_first else peer_cell }}
+  <td class="svc">{{ rule.services | services_text }}</td>
+  <td>{{ rule.applications | join(", ") if rule.applications != ["any"] else "any" }}</td>
+  {% if show_findings %}
+  <td>{{ tickets(rule) }}</td>
+  {% if show_usage %}<td class="num">{{ rule | hit_summary }}</td>{% endif %}
+  <td>
+    {%- for finding in view.findings %}{{ severity_badge(finding.severity.value) }} {% endfor -%}
+    {%- if not view.findings %}<span class="pill">ok</span>{% endif %}
+  </td>
+  {% endif %}
+  <td><button class="toggle" data-toggle="{{ index }}" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="{{ index }}" data-scope="{{ view.scope_id }}">
+  <td colspan="{{ columns }}">{{ rule_detail(view, show_findings) }}</td>
+</tr>
+{% endmacro %}
+
+{% macro rule_detail(view, show_findings=true) %}
+{%- set rule = view.rule -%}
+{#- The networks that put this rule in the reader's report are shown bold
+    wherever they appear, so the "why" line below points at something visible
+    rather than at a needle in a list of forty. -#}
+<dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">{{ rule.source | highlight_objects(view.highlight_networks) }}</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">{{ rule.source | highlight_networks(view.highlight_networks) }}</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">{{ rule.destination | highlight_objects(view.highlight_networks) }}</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">{{ rule.destination | highlight_networks(view.highlight_networks) }}</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">{{ rule.from_zones | join(", ") }} &rarr; {{ rule.to_zones | join(", ") }}</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">{{ rule.services | services_text }}</dd>
+    <dt>Applications</dt>
+    <dd class="mono">{{ rule.applications | join(", ") }}</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>{% if rule.action.permits_traffic %}{{ rule.action.value }}{% else %}{{ action_badge(rule.action.value) }} traffic does not pass{% endif %}{{ " (disabled)" if rule.disabled }}</dd>
+    <dt>Logging</dt>
+    <dd>{% if rule.log_end or rule.log_start %}enabled{% else %}<strong>not logged</strong>{% endif %}</dd>
+    <dt>Where it sits</dt>
+    <dd>{{ rule.location.label() }}, position {{ rule.order + 1 }}</dd>
+    {% if not show_findings %}<dt>Ticket</dt><dd>{{ tickets(rule) or "—" }}</dd>{% endif %}
+    {% if rule.tags %}<dt>Tags</dt><dd>{% for tag in rule.tags %}<span class="pill">{{ tag }}</span>{% endfor %}</dd>{% endif %}
+  </div>
+</dl>
+
+{% if rule.description %}
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt>
+  {#- Line breaks are kept. A description is a change log with one entry per
+      line; run together into a paragraph, the ticket from one line ends up
+      reading as though it belonged to the date on the next. -#}
+  <dd class="pre">{{ rule.description }}</dd>
+</div></dl>
+{% endif %}
+
+{% if rule.metadata.requester or rule.metadata.dates %}
+{#- A date whose role could not be established gets said plainly. Labelling it
+    "Unknown date" reads as though the date itself were unreadable, and pairing
+    that with `2024-12-09 [from "2024-12-09"]` -- the literal text and the
+    parsed value being identical -- says the same thing three times. The source
+    text is only worth showing when it differs from the date it produced. -#}
+{%- set date_labels = {
+  "expires": "Expires", "created": "Created", "reviewed": "Reviewed",
+  "unknown": "Date in the description, purpose not stated",
+} -%}
+{%- set latest = rule.metadata.latest_change -%}
+<dl class="detail-grid">
+  {% if rule.metadata.requester %}<div><dt>Requested by</dt><dd>{{ rule.metadata.requester }}</dd></div>{% endif %}
+  {#- Only the last edit. A description carrying a rule's whole history yields
+      one entry per change, and repeating "last changed" six times buries the
+      one date that answers the question. The rest stay in the description. -#}
+  {% if latest %}
+  <div>
+    <dt>Last changed</dt>
+    <dd>{{ latest.value }}{% if latest.by %} by {{ latest.by }}{% endif %}
+      {%- if rule.metadata.change_count > 1 %}
+      <span class="pill">{{ rule.metadata.change_count - 1 }} earlier change{{ "" if rule.metadata.change_count == 2 else "s" }} in the description</span>
+      {%- endif %}
+    </dd>
+  </div>
+  {% endif %}
+  {% for entry in rule.metadata.dates if entry.role != "changed" %}
+  <div>
+    <dt>{{ date_labels.get(entry.role, entry.role) }}</dt>
+    <dd>{{ entry.value }}
+      {%- if entry.raw != entry.value | string %} <span class="pill">from “{{ entry.raw }}”</span>{% endif %}
+    </dd>
+  </div>
+  {% endfor %}
+</dl>
+{% endif %}
+
+{% if rule.hits and show_findings %}
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Usage</dt>
+  <dd>{{ rule | hit_summary }} &mdash; collected {{ rule.hits.collected_at.strftime("%Y-%m-%d %H:%M") if rule.hits.collected_at }} from {{ rule.hits.source }}</dd>
+</div></dl>
+{% endif %}
+
+{% if view.findings and show_findings %}
+<div style="margin-top:0.6rem">
+  {% for finding in view.findings %}
+  <div class="finding-item {{ finding.severity.value }}">
+    {{ severity_badge(finding.severity.value) }} <strong>{{ finding.title }}</strong>
+    <span class="pill mono">{{ finding.code }}</span>
+    <div>{{ finding.detail }}</div>
+    {% if finding.recommendation %}<div class="rec">Suggested action: {{ finding.recommendation }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if view.coverage_reason %}
+{#- The inventory resolver's evidence *is* the coverage reason, so printing
+    both repeated the sentence verbatim. Only evidence that says something new
+    -- a tag, a zone, a naming convention -- is worth a second line. -#}
+{%- set extra = view.matches | rejectattr("evidence", "equalto", view.coverage_reason) | list -%}
+<div class="why">
+  <strong>Why this rule is in your report:</strong> {{ view.coverage_reason }}.
+  {%- for match in extra %} {{ match.evidence }} ({{ match.method }}).{% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{#
+  A rule table grouped into the blocks the firewall evaluates, in the order it
+  evaluates them. The grouping is not decoration: rules in two sibling device
+  groups are never seen by the same firewall, so presenting them as one
+  sequence would invent an order that does not exist -- and the block is also
+  the answer to "who can change this?".
+#}
+{% macro scoped_rule_table(groups, title, lede, section_id, offset=0, show_findings=true, show_direction=false, count=0, show_usage=true, labels={}, peers_first=false) %}
+{#- Pos, Rule, Your networks, Other side, Service, Application and the details
+    button are always there; the rest are switched on per section. -#}
+{%- set columns = 7
+    + (1 if show_direction else 0)
+    + (2 if show_findings else 0)
+    + (1 if show_findings and show_usage else 0) -%}
+<section class="block" data-section="{{ section_id }}" id="s-{{ section_id }}">
+  {{ section_heading(title, count ~ (" rule" if count == 1 else " rules"), section_id) }}
+  <div class="collapsible" data-body="{{ section_id }}">
+  <p class="lede">{{ lede }}</p>
+  {% if groups %}
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="num" title="Position of the rule inside its block">Pos</th>
+          {% if show_direction %}<th>Direction</th>{% endif %}
+          <th>Rule</th>
+          {% if peers_first %}<th>Other side</th><th>Your networks</th>
+          {% else %}<th>Your networks</th><th>Other side</th>{% endif %}
+          <th>Service</th><th>Application</th>
+          {% if show_findings %}
+          <th>Ticket</th>{% if show_usage %}<th>Usage</th>{% endif %}<th>Findings</th>
+          {% endif %}
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set ns = namespace(index=offset) %}
+        {% for scope, views in groups %}
+        <tr class="scope-row" data-scope-header="{{ scope.id }}">
+          <td colspan="{{ columns }}">
+            <span class="scope-step">{{ loop.index }}</span>
+            <span class="scope-title">{{ scope.title }}</span>
+            <span class="scope-reach">applies to {{ scope.applies_to }}</span>
+            <span class="scope-count">{{ views | length }} of {{ scope.rule_count }} rule{{ "" if scope.rule_count == 1 else "s" }} in this block concern you</span>
+          </td>
+        </tr>
+        {% for view in views %}{{ rule_row(view, ns.index + loop.index0, columns, show_findings, show_direction, show_usage, false, "", labels, peers_first) }}{% endfor %}
+        {% set ns.index = ns.index + views | length %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No rules in this category.</div>
+  {% endif %}
+  </div>
+</section>
+{% endmacro %}
+
+{#
+  A section heading that collapses its body and offers a way back to the top.
+  Reports run to hundreds of rows; without this the only navigation is the
+  scrollbar.
+#}
+{% macro section_heading(title, badge, section_id, level="h2") %}
+<{{ level }} class="section-head">
+  <button class="collapse" data-collapse="{{ section_id }}" aria-expanded="true"
+          aria-controls="s-{{ section_id }}" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">{{ title }}</span>
+  {% if badge %}<span class="count-badge">{{ badge }}</span>{% endif %}
+  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</{{ level }}>
+{% endmacro %}
+
+{#
+  A summary tile. With `href` it becomes the way into the section it counts:
+  the number is what a reader looks at first, so it is also what they reach
+  for when they want to see what is behind it.
+#}
+{% macro tile(value, label, hint="", tone="", href="") %}
+{% if href %}
+<a class="tile {{ tone }}" href="{{ href }}">
+  <div class="value">{{ value }}</div>
+  <div class="label">{{ label }}</div>
+  {% if hint %}<div class="hint">{{ hint }}</div>{% endif %}
+  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+{% else %}
+<div class="tile {{ tone }}">
+  <div class="value">{{ value }}</div>
+  <div class="label">{{ label }}</div>
+  {% if hint %}<div class="hint">{{ hint }}</div>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{#
+  The flat table, kept for the combined report: an overview across teams is
+  read by the firewall team, who need the location column and no grouping.
+#}
+{% macro rule_table(views, title, lede, show_team=false, offset=0) %}
+<section class="block" data-section="{{ title | lower | replace(' ', '-') }}">
+  <h2>{{ title }} <span class="count-badge">{{ views | length }} rule{{ "" if views | length == 1 else "s" }}</span></h2>
+  <p class="lede">{{ lede }}</p>
+  {% if views %}
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          {% if show_team %}<th>Team</th>{% endif %}
+          <th class="num">Pos</th><th>Direction</th><th>Rule</th>
+          <th>Your networks</th><th>Other side</th>
+          <th>Service</th><th>Application</th>
+          <th>Ticket</th><th>Usage</th><th>Findings</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for view in views %}{{ rule_row(view, offset + loop.index0, 12 if show_team else 11, true, true, true, show_team, view.team_name | default("")) }}{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">No rules in this category.</div>
+  {% endif %}
+</section>
+{% endmacro %}

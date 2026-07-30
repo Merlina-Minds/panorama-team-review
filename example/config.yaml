@@ -1,0 +1,88 @@
+# Example configuration -- produces the reports in ./reports/.
+#
+#     pan-review -c example/config.yaml run
+#
+# The backup it reads is invented; see ./README.md. Every setting not listed
+# here keeps its default, which is the point: a working configuration is short.
+
+input:
+  backup_dir: ./backup
+  patterns: ["*.xml"]
+  select: latest
+
+teams_file: inventory.yaml
+
+output:
+  directory: ./reports
+  # html -- what owners read; xlsx -- what they fill in and send back;
+  # pdf  -- the audit artefact, frozen per date; json -- the complete record.
+  #
+  # All four, so the example shows what each one actually looks like. PDF needs
+  # the optional WeasyPrint dependency; example/generate.py drops it with a
+  # warning rather than failing when it is missing, so the example stays
+  # rebuildable without it.
+  formats: [html, xlsx, pdf, json]
+  per_team: true
+  combined: true
+  # Off, so regenerating the example overwrites in place rather than leaving a
+  # new dated directory behind each time. A real run wants this on.
+  timestamped_subdir: false
+
+  # The date is dropped from the file names here, and only here. A real run
+  # wants it -- that is the default -- but a committed example whose file names
+  # change every time somebody regenerates it produces a diff full of renames
+  # and an example that looks a year stale the moment it is read.
+  filename_template: "{team_id}_firewall-review"
+  combined_filename_template: "00_OVERVIEW_all-teams"
+
+ownership:
+  order: [inventory, tag, regex, device_group, zone]
+  stop_after_first_match: true
+  match_mode: overlap
+  include_any_rules: true
+  max_any_rules_per_team: 30
+
+metadata:
+  # The generated descriptions read like real ones:
+  #   "CHG0041234 standard access, requested by A. Beck, created 05.03.2026"
+  ticket_patterns:
+    - name: servicenow
+      regex: '\b(?P<id>(?:CHG|INC|REQ)\d{7,})\b'
+      url_template: "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number={id}"
+      fields: [description, tag]
+
+  role_keywords:
+    expires: [until, expires, expiry, "valid until", bis, "gueltig bis"]
+    created: [created, added, requested, erstellt, beantragt]
+    changed: [changed, modified, edited, updated]
+    reviewed: [reviewed, checked, recertified, geprueft]
+
+  date_patterns:
+    - name: dot-dmy
+      regex: '\b\d{1,2}\.\d{1,2}\.\d{4}\b'
+      date_format: "%d.%m.%Y"
+    - name: iso
+      regex: '\b\d{4}-\d{2}-\d{2}\b'
+      date_format: "%Y-%m-%d"
+
+analysis:
+  broad_network_prefix_v4: 16
+  require_ticket: true
+  internet_zones: [outside, untrust, internet, wan]
+
+  # The generator marks a few objects as scheduled for deletion. A rule still
+  # pointing at one is exactly what a review should surface.
+  flag_object_patterns:
+    - pattern: '^OUTDATED_'
+      title: "Uses an object marked OUTDATED"
+      severity: medium
+      detail: "The rule references an object whose name marks it for deletion."
+      recommendation: "Confirm with the owner, then remove the rule or repoint it."
+
+report:
+  title: "Firewall Rule Review"
+  organisation: "Example Corp"
+  contact_text: >-
+    Questions about a rule, or need one changed? Raise a ticket with the
+    firewall team and quote the rule name and its location.
+  sort_rules_by: order

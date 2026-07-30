@@ -1,0 +1,311 @@
+{% import "macros.html.j2" as m %}<!doctype html>
+<html lang="{{ config.report.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ config.report.title }} — Overview across all teams</title>
+<style>{{ css }}</style>
+</head>
+<body>
+<a id="top"></a>
+
+<header class="report" id="page-header">
+  <div class="wrap">
+    <h1>{{ config.report.title }}</h1>
+    <div class="subject">Overview across all teams{% if config.report.organisation %} · {{ config.report.organisation }}{% endif %}</div>
+    <div class="provenance">
+      {# The overview is the firewall team's own view, so it keeps the technical
+         provenance the per-team reports drop -- but names the backup rather
+         than every document inside it. #}
+      <span><b>Configuration:</b> {{ bundle.meta.backup_label }}{% if bundle.meta.document_count > 1 %} ({{ bundle.meta.document_count }} documents){% endif %}</span>
+      {% if bundle.meta.file_mtime %}<span><b>Backup from:</b> {{ bundle.meta.file_mtime.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+      <span><b>Generated:</b> {{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}</span>
+      {% if bundle.meta.pan_os_version %}<span><b>PAN-OS:</b> {{ bundle.meta.pan_os_version }}</span>{% endif %}
+      <span><b>Tool:</b> panorama-team-review {{ bundle.meta.tool_version }}</span>
+    </div>
+
+    <nav class="jump" aria-label="Sections of this report">
+      <a href="#s-teams">Teams</a>
+      {% if bundle.scopes %}<a href="#s-scopes">Policy blocks</a>{% endif %}
+      {% if bundle.unassigned %}<a href="#s-unassigned">Rules without an owner</a>{% endif %}
+      {% if bundle.global_findings %}<a href="#s-findings">All findings</a>{% endif %}
+      <a href="#s-stats">Statistics</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tiles">
+    {{ m.tile(bundle.stats.get("rules_analysed", 0), "Rules analysed") }}
+    {{ m.tile(bundle.stats.get("teams_with_rules", 0), "Teams with rules",
+              bundle.stats.get("teams", 0) ~ " teams in the inventory", "", "#s-teams") }}
+    {{ m.tile(bundle.stats.get("rules_unassigned", 0), "Without an owner",
+              "Inventory gaps, not unimportant rules",
+              "serious" if bundle.stats.get("rules_unassigned", 0) else "",
+              "#s-unassigned" if bundle.unassigned else "") }}
+    {{ m.tile(bundle.stats.get("findings_high", 0), "High findings", "",
+              "critical" if bundle.stats.get("findings_high", 0) else "",
+              "#s-findings" if bundle.global_findings else "") }}
+    {{ m.tile(bundle.stats.get("findings_total", 0), "Findings total", "", "",
+              "#s-findings" if bundle.global_findings else "") }}
+  </div>
+
+  {% if bundle.notes %}
+  <div class="callout warn">
+    <h2>Notes from this run</h2>
+    <ul>{% for note in bundle.notes[:25] %}<li>{{ note }}</li>{% endfor %}</ul>
+    {% if bundle.notes | length > 25 %}<p style="margin:0.4rem 0 0">…and {{ bundle.notes | length - 25 }} more (see the JSON output).</p>{% endif %}
+  </div>
+  {% endif %}
+
+  <section class="block" id="s-teams">
+    {{ m.section_heading("Teams", bundle.teams | length, "teams") }}
+    <div class="collapsible" data-body="teams">
+      <p class="lede">
+        One report was produced per team. <em>Own</em> counts the rules written for that team's
+        address space — the review workload. <em>Also covers</em> counts the estate-wide rules that
+        include them without being theirs; those carry no findings in a team's report, because the
+        team cannot act on them. They are all in <em>All findings</em> below, which is this team's
+        list, not theirs.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Team</th><th>Contact</th><th>Networks</th>
+            <th class="num">Inbound</th><th class="num">Outbound</th><th class="num">Both ends</th>
+            <th class="num">No direction</th><th class="num">Own total</th>
+            <th class="num">Also covers</th><th class="num">Findings</th><th>Worst</th>
+          </tr></thead>
+          <tbody>
+          {% for team_report in bundle.teams %}
+            <tr>
+              <td class="name">{{ team_report.team.name }}<br><span class="pill mono">{{ team_report.team.id }}</span></td>
+              <td>{{ team_report.team.contact or "—" }}</td>
+              <td class="num">{{ team_report.team.assets | length }}</td>
+              <td class="num">{{ team_report.own("inbound") | length }}</td>
+              <td class="num">{{ team_report.own("outbound") | length }}</td>
+              <td class="num">{{ team_report.own("internal") | length }}</td>
+              <td class="num">{{ team_report.own("related") | length }}</td>
+              <td class="num">{{ team_report.own_rule_count }}</td>
+              <td class="num">{{ team_report.covered_views | length }}</td>
+              <td class="num">{{ team_report.findings | length }}</td>
+              <td>
+                {%- set worst = team_report.findings | map(attribute="severity") | map(attribute="value") | list -%}
+                {%- if "high" in worst %}{{ m.severity_badge("high") }}
+                {%- elif "medium" in worst %}{{ m.severity_badge("medium") }}
+                {%- elif "low" in worst %}{{ m.severity_badge("low") }}
+                {%- elif worst %}{{ m.severity_badge("info") }}
+                {%- else %}<span class="pill">none</span>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {% if bundle.scopes %}
+  <section class="block" id="s-scopes">
+    {{ m.section_heading("Policy blocks in evaluation order", bundle.scopes | length, "scopes") }}
+    <div class="collapsible" data-body="scopes">
+      <p class="lede">
+        The order a firewall reads its policy in, derived from the device-group hierarchy: shared
+        pre-rules, then each device group from the top of the hierarchy down, then the firewall's
+        own rules, then post-rules the other way round. Every per-team report groups its rules into
+        these blocks. Blocks from sibling device groups are never evaluated by the same firewall,
+        so their relative order below is a stable listing rather than a sequence.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th class="num">Step</th><th>Block</th><th>Stage</th><th class="num">Rules</th><th>Applies to</th></tr></thead>
+          <tbody>
+          {% for scope in bundle.scopes %}
+            <tr>
+              <td class="num">{{ scope.position + 1 }}</td>
+              <td class="name">{{ scope.title }}<br><span class="pill mono">{{ scope.id }}</span></td>
+              <td><span class="pill">{{ scope.stage }}</span></td>
+              <td class="num">{{ scope.rule_count }}</td>
+              <td>{{ scope.applies_to }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if bundle.unassigned %}
+  <section class="block" id="s-unassigned">
+    {{ m.section_heading("Rules without an owner", bundle.unassigned | length, "unassigned") }}
+    <div class="collapsible" data-body="unassigned">
+      <p class="lede">
+        No team could be determined for these rules. In almost every case this means the asset
+        inventory is incomplete rather than that the rules do not matter — this list is the best
+        guide to what the inventory is still missing. Expand one to see the object names and what
+        they resolve to, which is what says <em>whose</em> networks the inventory is missing.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Rule</th><th>Location</th><th>Source</th><th>Destination</th>
+            <th>Service</th><th>Ticket</th><th>Findings</th><th></th>
+          </tr></thead>
+          <tbody>
+          {% for view in bundle.unassigned[:400] %}
+            <tr class="rule-row{{ ' disabled' if view.rule.disabled }}" data-index="u{{ loop.index0 }}">
+              <td class="name">{{ view.rule.name }}
+                {%- if view.rule.disabled %} <span class="pill">disabled</span>{% endif %}
+                {%- if not view.rule.action.permits_traffic %} {{ m.action_badge(view.rule.action.value) }}{% endif %}
+              </td>
+              <td><span class="pill mono">{{ view.rule.location.label() }}</span></td>
+              <td class="objs">{{ view.rule.source | address_cells }}</td>
+              <td class="objs">{{ view.rule.destination | address_cells }}</td>
+              <td class="svc">{{ view.rule.services | services_text(8) }}</td>
+              <td>{{ m.tickets(view.rule) }}</td>
+              <td>{% for finding in view.findings %}{{ m.severity_badge(finding.severity.value) }} {% endfor %}</td>
+              <td><button class="toggle" data-toggle="u{{ loop.index0 }}" aria-expanded="false">details</button></td>
+            </tr>
+            <tr class="detail-row hidden" data-detail="u{{ loop.index0 }}">
+              <td colspan="8">{{ m.rule_detail(view) }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if bundle.unassigned | length > 400 %}
+      <p class="lede" style="margin-top:0.5rem">Showing the first 400 of {{ bundle.unassigned | length }}. The complete list is in the JSON output.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if bundle.global_findings %}
+  <section class="block" id="s-findings">
+    {{ m.section_heading("All findings", bundle.global_findings | length, "findings") }}
+    <div class="collapsible" data-body="findings">
+      <p class="lede">
+        Every cleanup candidate across the estate, most significant first — including the ones on
+        rules that merely cover a team, which are deliberately absent from the per-team reports
+        because no owner could act on them. This is the firewall team's list.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Severity</th><th>Finding</th><th>Rule</th><th>Location</th><th>Detail</th></tr></thead>
+          <tbody>
+          {% for finding in bundle.global_findings[:500] %}
+            <tr>
+              <td>{{ m.severity_badge(finding.severity.value) }}</td>
+              <td>{{ finding.title }}<br><span class="pill mono">{{ finding.code }}</span></td>
+              <td class="name">{{ finding.rule_name }}</td>
+              <td><span class="pill mono">{{ finding.location }}</span></td>
+              <td>{{ finding.detail }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if bundle.global_findings | length > 500 %}
+      <p class="lede" style="margin-top:0.5rem">Showing the first 500 of {{ bundle.global_findings | length }}.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="block" id="s-stats">
+    {{ m.section_heading("Configuration statistics", "", "stats") }}
+    <div class="collapsible" data-body="stats">
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Metric</th><th class="num">Value</th></tr></thead>
+          <tbody>
+          {% for key, value in bundle.stats | dictsort %}
+            <tr><td>{{ key | replace("_", " ") }}</td><td class="num">{{ value }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="report">
+    Generated by panorama-team-review {{ bundle.meta.tool_version }} from
+    {{ bundle.meta.backup_label }}{% if bundle.meta.document_count > 1 %}
+    ({{ bundle.meta.document_count }} configuration files){% endif %}{% if bundle.meta.config_hash %}
+    (sha256 {{ bundle.meta.config_hash[:16] }}…){% endif %}.
+    <a href="#top">Back to top ↑</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Same behaviour as a team report: a sticky header that shrinks, sections
+  // that collapse, and rules that expand. The overview is read the same way --
+  // scrolled through at length -- so it navigates the same way.
+  var header = document.getElementById("page-header");
+  function measure() {
+    if (!header) return;
+    document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  }
+  var COMPACT_FROM = 160;
+  var EXPAND_BELOW = 60;
+
+  if (header) {
+    window.addEventListener("scroll", function () {
+      var compact = header.classList.contains("compact");
+      if (!compact && window.scrollY > COMPACT_FROM) header.classList.add("compact");
+      else if (compact && window.scrollY < EXPAND_BELOW) header.classList.remove("compact");
+    }, { passive: true });
+
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(header);
+    else window.addEventListener("resize", measure);
+    measure();
+  }
+
+  function setCollapsed(button, collapsed) {
+    var id = button.getAttribute("data-collapse");
+    var body = document.querySelector('.collapsible[data-body="' + id + '"]');
+    if (!body) return;
+    body.classList.toggle("hidden", collapsed);
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var head = button.closest(".section-head");
+    if (head) head.classList.toggle("collapsed", collapsed);
+  }
+
+  document.querySelectorAll("button.collapse").forEach(function (button) {
+    button.addEventListener("click", function () {
+      setCollapsed(button, button.getAttribute("aria-expanded") === "true");
+    });
+  });
+
+  document.querySelectorAll('a[href^="#s-"]').forEach(function (link) {
+    link.addEventListener("click", function () {
+      var section = document.querySelector(link.getAttribute("href"));
+      if (!section) return;
+      var button = section.querySelector("button.collapse");
+      if (button && button.getAttribute("aria-expanded") === "false") setCollapsed(button, false);
+    });
+  });
+
+  var details = {};
+  document.querySelectorAll("tr.detail-row").forEach(function (row) {
+    details[row.getAttribute("data-detail")] = row;
+  });
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("button.toggle");
+    if (!button) return;
+    var detail = details[button.getAttribute("data-toggle")];
+    if (!detail) return;
+    var open = detail.classList.toggle("hidden");
+    button.setAttribute("aria-expanded", open ? "false" : "true");
+    button.textContent = open ? "details" : "hide";
+  });
+})();
+</script>
+</body>
+</html>

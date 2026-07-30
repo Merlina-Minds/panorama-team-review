@@ -1,0 +1,518 @@
+{% import "macros.html.j2" as m %}<!doctype html>
+<html lang="{{ config.report.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ config.report.title }} — {{ report.team.name }}</title>
+<style>{{ css }}</style>
+</head>
+<body>
+<a id="top"></a>
+
+{% set own_inbound = report.own("inbound") %}
+{% set own_outbound = report.own("outbound") %}
+{% set own_internal = report.own("internal") %}
+{% set own_related = report.own("related") %}
+{% set cov_inbound = report.covered("inbound") %}
+{% set cov_outbound = report.covered("outbound") %}
+{% set cov_internal = report.covered("internal") %}
+{% set cov_related = report.covered("related") %}
+{% set covered_total = report.covered_views | length %}
+{% set labels = report.team.asset_labels %}
+
+{#
+  The header sticks to the top of the window. A report runs to hundreds of
+  rows, and once the title has scrolled away there is nothing left saying whose
+  report this is -- which matters when several are open at once. It shrinks to
+  a single line as soon as the page moves, so it costs almost no space.
+#}
+<header class="report" id="page-header">
+  <div class="wrap">
+    <h1>{{ config.report.title }}</h1>
+    <div class="subject">{{ report.team.name }}{% if report.team.contact %} · {{ report.team.contact }}{% endif %}</div>
+    <div class="provenance">
+      {# The configuration file is named only when there is one. A Panorama
+         scheduled backup holds a document per managed firewall, and listing
+         all of them says nothing an owner can use -- the date the
+         backup was taken is the fact that matters. The PAN-OS version is gone
+         for the same reason: it differs across the firewalls a single report
+         covers, and no owner decision depends on it. Both remain in the JSON
+         output and on the PDF cover page, which is the audit artefact. #}
+      {% if bundle.meta.document_count == 1 %}
+      <span><b>Configuration:</b> {{ bundle.meta.source_file }}</span>
+      {% endif %}
+      {% if bundle.meta.file_mtime %}<span><b>Backup from:</b> {{ bundle.meta.file_mtime.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+      <span><b>Report generated:</b> {{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}</span>
+      <span><b>Tool:</b> panorama-team-review {{ bundle.meta.tool_version }}</span>
+    </div>
+
+    {% if report.rule_count or report.team.assets %}
+    <nav class="jump" aria-label="Sections of this report">
+      {% if report.team.assets %}<a href="#s-networks">Your networks</a>{% endif %}
+      {% if report.objects %}<a href="#s-objects">Objects &amp; groups</a>{% endif %}
+      {% if own_inbound %}<a href="#s-own-inbound">Inbound</a>{% endif %}
+      {% if own_outbound %}<a href="#s-own-outbound">Outbound</a>{% endif %}
+      {% if own_internal %}<a href="#s-own-internal">Both ends yours</a>{% endif %}
+      {% if own_related %}<a href="#s-own-related">No direction</a>{% endif %}
+      {% if cov_inbound %}<a href="#s-covered-inbound">Also covers: inbound</a>{% endif %}
+      {% if cov_outbound %}<a href="#s-covered-outbound">Also covers: outbound</a>{% endif %}
+      {% if cov_internal or cov_related %}<a href="#s-covered-other">Also covers: other</a>{% endif %}
+      {% if report.findings %}<a href="#s-findings">Cleanup candidates</a>{% endif %}
+    </nav>
+    {% endif %}
+  </div>
+</header>
+
+<div class="wrap">
+
+  {# Each tile links to the section it counts. The number is the first thing a
+     reader looks at, so it should also be the way in. #}
+  {% set covered_anchor = "#s-covered-inbound" if cov_inbound
+       else ("#s-covered-outbound" if cov_outbound else "#s-covered-other") %}
+  <div class="tiles">
+    {{ m.tile(report.team.assets | length, "Your networks", "From the asset inventory",
+              "", "#s-networks" if report.team.assets else "") }}
+    {{ m.tile(own_inbound | length, "Inbound", "Who reaches your networks",
+              "", "#s-own-inbound" if own_inbound else "") }}
+    {{ m.tile(own_outbound | length, "Outbound", "What your networks reach",
+              "", "#s-own-outbound" if own_outbound else "") }}
+    {{ m.tile(covered_total, "Also cover you", "Central rules, nothing to do",
+              "", covered_anchor if covered_total else "") }}
+    {% set high = report.findings | selectattr("severity.value", "equalto", "high") | list | length %}
+    {{ m.tile(report.findings | length, "Cleanup candidates",
+              (high ~ " need attention") if high else "Nothing urgent",
+              "critical" if high else "",
+              "#s-findings" if report.findings else "") }}
+  </div>
+
+  <div class="callout">
+    <h2>How to read this report</h2>
+    <p style="margin:0 0 0.5rem">
+      This report contains two kinds of rule, and only the first kind is a question to you.
+    </p>
+    <ul>
+      <li>
+        <strong>Your rules</strong> — rules written for your address space: something in the rule
+        names one of your networks, or carries your team's tag or zone. You are the one who can
+        say whether they are still needed.
+        <ul>
+          <li><strong>Inbound</strong> — other systems may reach yours. Read these first: they are your exposure.</li>
+          <li><strong>Outbound</strong> — your systems may reach elsewhere.</li>
+          <li><strong>Both ends yours</strong> — source and destination are both networks of yours, so the traffic stays inside your own address space.</li>
+          <li><strong>No direction</strong> — attributed to your team by tag, name or device group, which does not say which side you are on.</li>
+        </ul>
+      </li>
+      <li>
+        <strong>Rules that also cover your networks</strong> — estate-wide rules that happen to
+        include you: ping, DNS, Active Directory and the like. Your networks sit inside a much
+        larger one the rule names. <strong>Nothing is being asked of you here.</strong> They are
+        listed so you can see the access you already have — there is no need to request it — and
+        so you can speak up if one of your systems must <em>not</em> have it.
+      </li>
+    </ul>
+    <p style="margin:0.6rem 0 0">
+      Addresses are shown by <strong>name</strong>, because the name is what a change request has
+      to cite. Hold the mouse over one to see the networks and addresses behind it.
+    </p>
+    <p style="margin:0.6rem 0 0">
+      Rules are listed in the order the firewall evaluates them, grouped into the blocks it
+      evaluates as a unit. The first matching rule wins, so a rule above another can make it
+      irrelevant. Each block says which firewalls it applies to and how many rules it holds in
+      total, so you can see that rules you are not shown sit between the ones you are.
+    </p>
+    <p style="margin:0.6rem 0 0">
+      Expand any rule with <em>details</em> for the exact object names, the resolved networks,
+      the ports, and why the rule is in your report. Every section heading collapses.
+      {% if config.report.contact_text %}{{ config.report.contact_text }}{% endif %}
+      {% if config.report.change_request_url %}
+      <a href="{{ config.report.change_request_url }}" rel="noopener">Request a change</a>.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if not bundle.hitcount_available %}
+  <div class="callout warn">
+    <h2>Usage data not included</h2>
+    <p style="margin:0">
+      Rule hit counters are runtime state and are not part of a configuration backup, so this
+      report cannot say how often a rule matched. Statements about unused rules are therefore
+      absent rather than guessed. Hit counts can be collected separately by enabling the
+      optional enrichment module.
+    </p>
+  </div>
+  {% endif %}
+
+  {% if report.team.assets %}
+  <section class="block" id="s-networks">
+    {{ m.section_heading("Your networks",
+        (report.team.assets | length) ~ (" network" if report.team.assets | length == 1 else " networks"),
+        "networks") }}
+    <div class="collapsible" data-body="networks">
+      <p class="lede">
+        What this report considers yours, and how many of your own rules touch each. Everything
+        below follows from this list — if a network is missing or does not belong to you, tell the
+        firewall team, because the rest of the report will be wrong in the same way.
+      </p>
+      <div class="table-scroll{{ ' capped' if report.team.assets | length > 12 }}">
+        <table>
+          <thead><tr><th>Network</th><th>System</th><th class="num">Inbound</th><th class="num">Outbound</th></tr></thead>
+          <tbody>
+          {% for cidr in report.team.assets %}
+            <tr>
+              <td class="addr">{{ cidr }}</td>
+              <td>{{ report.team.asset_labels.get(cidr, "—") }}</td>
+              <td class="num">{{ asset_counts.inbound.get(cidr, 0) }}</td>
+              <td class="num">{{ asset_counts.outbound.get(cidr, 0) }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if report.objects %}
+  <section class="block" id="s-objects">
+    {{ m.section_heading("Objects and groups inside your networks", report.objects | length, "objects") }}
+    <div class="collapsible" data-body="objects">
+      <p class="lede">
+        What your networks are called in the firewall. Every address object and group whose
+        addresses lie entirely within your networks — these are the names to quote when you ask
+        for a rule to be changed, and the names you will see in the rules below.
+      </p>
+      <div class="table-scroll{{ ' capped' if report.objects | length > 12 }}">
+        <table>
+          <thead><tr><th>Name</th><th>Kind</th><th>Defined in</th><th>Covers</th><th>Description</th></tr></thead>
+          <tbody>
+          {% for obj in report.objects %}
+            <tr>
+              <td class="name mono">{{ obj.name }}</td>
+              <td><span class="pill">{{ obj.kind }}</span></td>
+              <td><span class="pill mono">{{ obj.scope }}</span></td>
+              <td class="addr">{{ obj.networks[:8] | join(", ") }}{% if obj.networks | length > 8 %}, … (+{{ obj.networks | length - 8 }} more){% endif %}</td>
+              <td>{{ obj.description }}
+                {%- for tag in obj.tags %} <span class="pill">{{ tag }}</span>{% endfor %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if report.rule_count %}
+  <div class="controls">
+    <input type="search" id="filter" placeholder="Filter by rule name, address, port, ticket…" aria-label="Filter rules">
+    <button data-severity="high" aria-pressed="false">▲ High</button>
+    <button data-severity="medium" aria-pressed="false">◆ Medium</button>
+    <button data-severity="low" aria-pressed="false">● Low</button>
+    <button id="clear">Clear</button>
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+    <button id="collapse-all">⊟ Collapse all</button>
+    <button id="theme" title="Switch between light and dark">◐ Theme</button>
+  </div>
+  {% endif %}
+
+  <h2 class="part">Your rules <span class="count-badge">{{ report.own_rule_count }}</span></h2>
+  <p class="part-lede">
+    Written for your address space. These are the ones to decide on.
+  </p>
+
+  {% set ns = namespace(offset=0) %}
+
+  {{ m.scoped_rule_table(own_inbound | group_by_scope(bundle.scopes),
+     "Inbound — who reaches your networks",
+     "Traffic from elsewhere that is permitted to reach the networks you own.",
+     "own-inbound", ns.offset, true, false, own_inbound | length, bundle.hitcount_available, labels, true) }}
+  {% set ns.offset = ns.offset + own_inbound | length %}
+
+  {{ m.scoped_rule_table(own_outbound | group_by_scope(bundle.scopes),
+     "Outbound — what your networks reach",
+     "Traffic your systems are permitted to send to other networks.",
+     "own-outbound", ns.offset, true, false, own_outbound | length, bundle.hitcount_available, labels) }}
+  {% set ns.offset = ns.offset + own_outbound | length %}
+
+  {% if own_internal %}
+  {{ m.scoped_rule_table(own_internal | group_by_scope(bundle.scopes),
+     "Both ends yours — traffic that stays inside your own networks",
+     "Source and destination are both networks you own, so no other team is involved.",
+     "own-internal", ns.offset, true, false, own_internal | length, bundle.hitcount_available, labels) }}
+  {% set ns.offset = ns.offset + own_internal | length %}
+  {% endif %}
+
+  {% if own_related %}
+  {{ m.scoped_rule_table(own_related | group_by_scope(bundle.scopes),
+     "No direction — attributed to your team by label",
+     "A tag, a naming convention or a device group puts these rules with your team. That says
+      they are yours, but not which side of the connection you are on.",
+     "own-related", ns.offset, true, false, own_related | length, bundle.hitcount_available, labels) }}
+  {% set ns.offset = ns.offset + own_related | length %}
+  {% endif %}
+
+  {% if covered_total %}
+  <h2 class="part">Rules that also cover your networks <span class="count-badge">{{ covered_total }}</span></h2>
+  <p class="part-lede">
+    Estate-wide rules maintained centrally. Nothing to decide — this is for information. Your
+    networks fall inside a much larger network these rules name, or the rule permits ‘any’. You
+    did not request them and cannot change them on your own, but they are access you have: no
+    need to apply for it, and if one of your systems must be excluded, say so.
+  </p>
+
+  {% if cov_inbound %}
+  {{ m.scoped_rule_table(cov_inbound | group_by_scope(bundle.scopes),
+     "Inbound — who may already reach your networks",
+     "Central rules that let other systems reach yours. This is exposure you did not request,
+      which is exactly why it is worth reading.",
+     "covered-inbound", ns.offset, false, false, cov_inbound | length, false, labels, true) }}
+  {% set ns.offset = ns.offset + cov_inbound | length %}
+  {% endif %}
+
+  {% if cov_outbound %}
+  {{ m.scoped_rule_table(cov_outbound | group_by_scope(bundle.scopes),
+     "Outbound — what your networks may already reach",
+     "Central rules that let your systems out: DNS, updates, monitoring and the like. No need to
+      request any of this.",
+     "covered-outbound", ns.offset, false, false, cov_outbound | length, false, labels) }}
+  {% set ns.offset = ns.offset + cov_outbound | length %}
+  {% endif %}
+
+  {% if cov_internal or cov_related %}
+  {% set cov_other = cov_internal + cov_related %}
+  {{ m.scoped_rule_table(cov_other | group_by_scope(bundle.scopes),
+     "Without a clear direction",
+     "Rules permitting any source to any destination, so no side can be called yours or theirs.",
+     "covered-other", ns.offset, false, true, cov_other | length, false, labels) }}
+  {% set ns.offset = ns.offset + cov_other | length %}
+  {% endif %}
+  {% endif %}
+
+  {% if report.findings %}
+  <section class="block" id="s-findings">
+    {{ m.section_heading("Cleanup candidates", report.findings | length, "findings") }}
+    <div class="collapsible" data-body="findings">
+      <p class="lede">
+        Findings on your own rules only. Rules that merely cover your networks are maintained by
+        the firewall team and are not listed here, because you could not act on them.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Severity</th><th>Finding</th><th>Rule</th><th>Location</th><th>Detail</th><th>Suggested action</th></tr></thead>
+          <tbody>
+          {% for finding in report.findings %}
+            <tr>
+              <td>{{ m.severity_badge(finding.severity.value) }}</td>
+              <td>{{ finding.title }}<br><span class="pill mono">{{ finding.code }}</span></td>
+              <td class="name">{{ finding.rule_name }}</td>
+              <td><span class="pill mono">{{ finding.location }}</span></td>
+              <td>{{ finding.detail }}</td>
+              <td>{{ finding.recommendation }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if report.rule_count == 0 %}
+  <div class="empty" style="padding:2rem">
+    No firewall rules were attributed to your team in this configuration.<br>
+    If that is unexpected, the asset inventory may be missing your networks — please contact the
+    firewall team.
+  </div>
+  {% endif %}
+
+  <footer class="report">
+    Generated by panorama-team-review {{ bundle.meta.tool_version }} from
+    {{ bundle.meta.backup_label }}{% if bundle.meta.document_count > 1 %}
+    ({{ bundle.meta.document_count }} configuration files){% endif %}{% if bundle.meta.config_hash %}
+    (sha256 {{ bundle.meta.config_hash[:16] }}…){% endif %}.
+    This report reflects the configuration as backed up; changes made afterwards are not included.
+    <a href="#top">Back to top ↑</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // --- sticky header ------------------------------------------------------
+  // The table header rows stick directly below the page header, so they need
+  // its current height. Measured rather than hard-coded: it depends on the team
+  // name, the contact and how many sections the jump bar lists -- and it
+  // changes when the header shrinks on scroll.
+  var header = document.getElementById("page-header");
+  function measure() {
+    if (!header) return;
+    document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  }
+  // Two thresholds, not one. With a single boundary the header shrinks, the
+  // page gets shorter, the scroll position falls back below the boundary, and
+  // it expands again -- a flicker that is worst exactly where a reader tends to
+  // stop. Requiring a clear move in each direction removes it.
+  var COMPACT_FROM = 160;
+  var EXPAND_BELOW = 60;
+
+  if (header) {
+    window.addEventListener("scroll", function () {
+      var compact = header.classList.contains("compact");
+      if (!compact && window.scrollY > COMPACT_FROM) header.classList.add("compact");
+      else if (compact && window.scrollY < EXPAND_BELOW) header.classList.remove("compact");
+    }, { passive: true });
+
+    if (window.ResizeObserver) {
+      // The header shrinks through a CSS transition, so its height is not yet
+      // final at the moment the class changes. Measuring only then left the
+      // column headers floating a transition's worth of pixels too low, with
+      // table rows sliding through the gap. Observing the element instead
+      // keeps the offset correct for every frame of the animation.
+      new ResizeObserver(measure).observe(header);
+    } else {
+      window.addEventListener("resize", measure);
+      header.addEventListener("transitionend", measure);
+    }
+    measure();
+  }
+
+  // --- collapsible sections ----------------------------------------------
+  function setCollapsed(button, collapsed) {
+    var id = button.getAttribute("data-collapse");
+    var body = document.querySelector('.collapsible[data-body="' + id + '"]');
+    if (!body) return;
+    body.classList.toggle("hidden", collapsed);
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var head = button.closest(".section-head");
+    if (head) head.classList.toggle("collapsed", collapsed);
+  }
+
+  document.querySelectorAll("button.collapse").forEach(function (button) {
+    button.addEventListener("click", function () {
+      setCollapsed(button, button.getAttribute("aria-expanded") === "true");
+    });
+  });
+
+  var collapseAll = document.getElementById("collapse-all");
+  if (collapseAll) {
+    collapseAll.addEventListener("click", function () {
+      var buttons = Array.prototype.slice.call(document.querySelectorAll("button.collapse"));
+      var anyOpen = buttons.some(function (b) {
+        return b.getAttribute("aria-expanded") === "true";
+      });
+      buttons.forEach(function (b) { setCollapsed(b, anyOpen); });
+      collapseAll.textContent = anyOpen ? "⊞ Expand all" : "⊟ Collapse all";
+    });
+  }
+
+  // Any link into a collapsed section -- the jump bar or a summary tile --
+  // would otherwise scroll to a heading with nothing under it, which reads as
+  // a broken link.
+  document.querySelectorAll('a[href^="#s-"]').forEach(function (link) {
+    link.addEventListener("click", function () {
+      var section = document.querySelector(link.getAttribute("href"));
+      if (!section) return;
+      var button = section.querySelector("button.collapse");
+      if (button && button.getAttribute("aria-expanded") === "false") setCollapsed(button, false);
+    });
+  });
+
+  // --- filtering ----------------------------------------------------------
+  var input = document.getElementById("filter");
+  if (!input) return;
+
+  var rows = Array.prototype.slice.call(document.querySelectorAll("tr.rule-row"));
+  var details = {};
+  document.querySelectorAll("tr.detail-row").forEach(function (row) {
+    details[row.getAttribute("data-detail")] = row;
+  });
+  var counter = document.getElementById("count");
+  var severities = new Set();
+
+  function apply() {
+    var needle = input.value.trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var haystack = row.getAttribute("data-search") || "";
+      var matchesText = !needle || haystack.indexOf(needle) !== -1;
+      var matchesSeverity = severities.size === 0 || severities.has(row.getAttribute("data-severity"));
+      var show = matchesText && matchesSeverity;
+      row.classList.toggle("hidden", !show);
+      if (show) visible++;
+      var detail = details[row.getAttribute("data-index")];
+      if (detail && !show) {
+        detail.classList.add("hidden");
+        var button = row.querySelector(".toggle");
+        if (button) button.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    // A block heading with nothing left under it is worse than no heading: it
+    // reads as "your rules in this block were filtered to zero" only if you
+    // notice the emptiness, and as a rendering bug otherwise.
+    document.querySelectorAll("tr.scope-row").forEach(function (head) {
+      var section = head.closest("section");
+      var scope = head.getAttribute("data-scope-header");
+      var any = section.querySelectorAll(
+        'tr.rule-row[data-scope="' + (window.CSS && CSS.escape ? CSS.escape(scope) : scope) + '"]:not(.hidden)'
+      ).length;
+      head.classList.toggle("hidden", any === 0);
+    });
+
+    counter.textContent = visible + " of " + rows.length + " rules shown";
+    document.querySelectorAll("section.block[data-section]").forEach(function (section) {
+      var any = section.querySelectorAll("tr.rule-row:not(.hidden)").length;
+      section.classList.toggle("hidden", needle !== "" || severities.size > 0 ? any === 0 : false);
+    });
+  }
+
+  input.addEventListener("input", apply);
+
+  document.querySelectorAll(".controls button[data-severity]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var value = button.getAttribute("data-severity");
+      if (severities.has(value)) { severities.delete(value); button.setAttribute("aria-pressed", "false"); }
+      else { severities.add(value); button.setAttribute("aria-pressed", "true"); }
+      apply();
+    });
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    input.value = "";
+    severities.clear();
+    document.querySelectorAll(".controls button[data-severity]").forEach(function (b) {
+      b.setAttribute("aria-pressed", "false");
+    });
+    apply();
+  });
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("button.toggle");
+    if (!button) return;
+    var detail = details[button.getAttribute("data-toggle")];
+    if (!detail) return;
+    var open = detail.classList.toggle("hidden");
+    button.setAttribute("aria-expanded", open ? "false" : "true");
+    button.textContent = open ? "details" : "hide";
+  });
+
+  var theme = document.getElementById("theme");
+  if (theme) {
+    theme.addEventListener("click", function () {
+      var root = document.documentElement;
+      var current = root.getAttribute("data-theme");
+      if (!current) {
+        current = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      root.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+    });
+  }
+
+  apply();
+})();
+</script>
+</body>
+</html>

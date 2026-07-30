@@ -1,0 +1,136 @@
+{# Cross-team PDF: the firewall team's own record of a review cycle. #}
+<!doctype html>
+<html lang="{{ config.report.language }}">
+<head>
+<meta charset="utf-8">
+<title>{{ config.report.title }} — Overview</title>
+<style>{{ css }}</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>{{ config.report.title }}</h1>
+  <div class="subject">Overview across all teams{% if config.report.organisation %} — {{ config.report.organisation }}{% endif %}</div>
+  <div class="provenance-line">
+    {{ bundle.meta.backup_label }} · generated {{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-cell"><div class="value">{{ bundle.stats.get("rules_analysed", 0) }}</div><div class="label">Rules</div></div>
+    <div class="summary-cell"><div class="value">{{ bundle.stats.get("teams_with_rules", 0) }}</div><div class="label">Teams</div></div>
+    <div class="summary-cell"><div class="value">{{ bundle.stats.get("rules_unassigned", 0) }}</div><div class="label">No owner</div></div>
+    <div class="summary-cell"><div class="value">{{ bundle.stats.get("findings_high", 0) }}</div><div class="label">High findings</div></div>
+    <div class="summary-cell"><div class="value">{{ bundle.stats.get("findings_total", 0) }}</div><div class="label">Findings</div></div>
+  </div>
+
+  <div class="cover-meta">
+    <table>
+      <tr><td class="key">Configuration source</td><td>{{ bundle.meta.backup_label }}{% if bundle.meta.document_count > 1 %} ({{ bundle.meta.document_count }} configuration documents){% endif %}</td></tr>
+      <tr><td class="key">Configuration type</td><td>{{ bundle.meta.source_type }}{% if bundle.meta.pan_os_version %}, PAN-OS {{ bundle.meta.pan_os_version }}{% endif %}</td></tr>
+      {% if bundle.meta.file_mtime %}<tr><td class="key">Backup timestamp</td><td>{{ bundle.meta.file_mtime.strftime("%Y-%m-%d %H:%M") }}</td></tr>{% endif %}
+      <tr><td class="key">Report generated</td><td>{{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}</td></tr>
+      {% if bundle.meta.config_hash %}<tr><td class="key">Configuration checksum</td><td class="mono">sha256:{{ bundle.meta.config_hash[:32] }}…</td></tr>{% endif %}
+      <tr><td class="key">Tool</td><td>panorama-team-review {{ bundle.meta.tool_version }}</td></tr>
+    </table>
+  </div>
+
+  {% if bundle.notes %}
+  <div class="note">
+    <strong>Notes from this run</strong>
+    <ul style="margin:1.5mm 0 0;padding-left:4mm">
+      {% for note in bundle.notes[:12] %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+    {% if bundle.notes | length > 12 %}<p style="margin:1.5mm 0 0">…and {{ bundle.notes | length - 12 }} more (see the JSON output).</p>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<section class="first">
+  <h2>Teams ({{ bundle.teams | length }})</h2>
+  <p class="lede">
+    One report was produced per team. <em>Own</em> counts the rules written for that team's
+    address space; <em>also covers</em> the estate-wide ones that include them without being
+    theirs, which carry no findings in a team's report.
+  </p>
+  <table>
+    <colgroup><col style="width:22%"><col style="width:22%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:10%"></colgroup>
+    <thead><tr>
+      <th>Team</th><th>Contact</th><th>Networks</th><th>Inbound</th><th>Outbound</th>
+      <th>Own total</th><th>Also covers</th><th>Findings</th>
+    </tr></thead>
+    <tbody>
+    {% for team_report in bundle.teams %}
+      <tr>
+        <td>{{ team_report.team.name }}</td>
+        <td>{{ team_report.team.contact or "—" }}</td>
+        <td>{{ team_report.team.assets | length }}</td>
+        <td>{{ team_report.own("inbound") | length }}</td>
+        <td>{{ team_report.own("outbound") | length }}</td>
+        <td>{{ team_report.own_rule_count }}</td>
+        <td>{{ team_report.covered_views | length }}</td>
+        <td>{{ team_report.findings | length }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if bundle.unassigned %}
+<section>
+  <h2>Rules without an owner ({{ bundle.unassigned | length }})</h2>
+  <p class="lede">
+    Almost always a sign that the asset inventory is incomplete rather than that the rules do not
+    matter. This list is the best guide to what the inventory is still missing.
+  </p>
+  <table>
+    <colgroup><col style="width:20%"><col style="width:12%"><col style="width:22%"><col style="width:22%"><col style="width:14%"><col style="width:10%"></colgroup>
+    <thead><tr><th>Rule</th><th>Location</th><th>Source</th><th>Destination</th><th>Service</th><th>Ticket</th></tr></thead>
+    <tbody>
+    {% for view in bundle.unassigned[:300] %}
+      <tr class="{{ 'disabled' if view.rule.disabled }}">
+        <td>{{ view.rule.name }}</td>
+        <td class="mono">{{ view.rule.location.label() }}</td>
+        <td class="mono">{{ view.rule.source | addresses_text(6) }}</td>
+        <td class="mono">{{ view.rule.destination | addresses_text(6) }}</td>
+        <td class="mono">{{ view.rule.services | services_text(5) }}</td>
+        <td class="mono">{{ view.rule | tickets_text }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if bundle.unassigned | length > 300 %}
+  <p class="lede" style="margin-top:2mm">Showing the first 300 of {{ bundle.unassigned | length }}. The complete list is in the JSON output.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if bundle.global_findings %}
+<section>
+  <h2>All findings ({{ bundle.global_findings | length }})</h2>
+  <table>
+    <colgroup><col style="width:8%"><col style="width:16%"><col style="width:18%"><col style="width:12%"><col style="width:46%"></colgroup>
+    <thead><tr><th>Severity</th><th>Finding</th><th>Rule</th><th>Location</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for finding in bundle.global_findings[:400] %}
+      <tr>
+        <td><span class="sev sev-{{ finding.severity.value }}">{{ finding.severity.value | upper }}</span></td>
+        <td>{{ finding.title }}<br><span class="tag mono">{{ finding.code }}</span></td>
+        <td>{{ finding.rule_name }}</td>
+        <td class="mono">{{ finding.location }}</td>
+        <td>{{ finding.detail }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if bundle.global_findings | length > 400 %}
+  <p class="lede" style="margin-top:2mm">Showing the first 400 of {{ bundle.global_findings | length }}.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<footer>
+  Generated by panorama-team-review {{ bundle.meta.tool_version }} from {{ bundle.meta.backup_label }}.
+</footer>
+
+</body>
+</html>

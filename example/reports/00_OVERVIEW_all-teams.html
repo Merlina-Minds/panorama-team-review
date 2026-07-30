@@ -1,0 +1,2049 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firewall Rule Review — Overview across all teams</title>
+<style>/* Report styling.
+ *
+ * Colour is used for status only, never as the sole carrier of meaning: every
+ * severity and direction badge pairs its colour with an icon and a word, so the
+ * report stays readable in greyscale print, in forced-colours mode, and for
+ * readers with colour vision deficiency.
+ *
+ * Status steps and ink tokens follow a validated palette; both light and dark
+ * are stepped deliberately rather than flipped.
+ */
+
+:root {
+  --surface: #fcfcfb;
+  --plane: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+
+  --status-critical: #d03b3b;
+  --status-serious: #ec835a;
+  --status-warning: #fab219;
+  --status-good: #0ca30c;
+
+  --tint-critical: rgba(208, 59, 59, 0.10);
+  --tint-serious: rgba(236, 131, 90, 0.12);
+  --tint-warning: rgba(250, 178, 25, 0.14);
+  --tint-neutral: rgba(137, 135, 129, 0.10);
+
+  --accent: #1f3864;
+  --link: #0563c1;
+
+  --radius: 6px;
+  --gap: 1rem;
+}
+
+/* Dark mode is a deliberate second set of steps, not an inversion of the first.
+ *
+ * The same complete set is applied twice: once for viewers whose system asks
+ * for dark, and once for viewers who pressed the theme button. Both must carry
+ * *every* token -- an earlier version listed only the surfaces here, which left
+ * the light-surface status tints on a dark background where they were nearly
+ * invisible.
+ *
+ * The :not([data-theme="light"]) guard is what lets the button override a dark
+ * system preference; without it the toggle would only work in one direction. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #1a1a19;
+    --plane: #0d0d0d;
+    --ink: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --tint-critical: rgba(208, 59, 59, 0.22);
+    --tint-serious: rgba(236, 131, 90, 0.20);
+    --tint-warning: rgba(250, 178, 25, 0.18);
+    --tint-neutral: rgba(195, 194, 183, 0.10);
+    --accent: #93b4ea;
+    --link: #7fb4f5;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: #1a1a19;
+  --plane: #0d0d0d;
+  --ink: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --tint-critical: rgba(208, 59, 59, 0.22);
+  --tint-serious: rgba(236, 131, 90, 0.20);
+  --tint-warning: rgba(250, 178, 25, 0.18);
+  --tint-neutral: rgba(195, 194, 183, 0.10);
+  --accent: #93b4ea;
+  --link: #7fb4f5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 4rem;
+  background: var(--plane);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* --- header ------------------------------------------------------------- */
+
+/* The header stays at the top of the window. Once a three-hundred-row table
+ * has scrolled the title away there is nothing left saying whose report this
+ * is, which matters most when several are open side by side. It shrinks to one
+ * line as soon as the page moves, so the cost is a few pixels rather than a
+ * banner permanently occupying a fifth of the screen. */
+header.report {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1.75rem 0 1rem;
+  margin-bottom: 1.5rem;
+  transition: padding 0.15s ease;
+}
+
+header.report h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+  transition: font-size 0.15s ease;
+}
+
+header.report .subject {
+  font-size: 1.05rem;
+  color: var(--ink-secondary);
+  margin-bottom: 0.75rem;
+}
+
+header.report.compact { padding: 0.5rem 0 0.4rem; }
+header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
+header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
+header.report.compact .provenance { display: none; }
+header.report.compact nav.jump { margin-top: 0.35rem; }
+
+.provenance {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+
+.provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- jump navigation ----------------------------------------------------- */
+
+nav.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.75rem;
+}
+
+nav.jump a {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Anchors have to clear the sticky header, or a jump link lands with its
+ * heading hidden behind it. */
+section.block, h2.part { scroll-margin-top: calc(var(--header-h, 5rem) + 1rem); }
+
+/* --- stat tiles --------------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  position: relative;
+  display: block;
+}
+
+/* A tile that counts something links to the section holding it. */
+a.tile { text-decoration: none; color: inherit; }
+a.tile:hover { border-color: var(--accent); }
+a.tile:hover .value { color: var(--accent); }
+
+.tile-go {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+a.tile:hover .tile-go { color: var(--accent); }
+
+.tile .value {
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile .label {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.2rem;
+}
+
+.tile .hint { font-size: 0.78rem; color: var(--ink-secondary); margin-top: 0.35rem; }
+.tile.critical { border-left: 3px solid var(--status-critical); }
+.tile.serious  { border-left: 3px solid var(--status-serious); }
+
+/* --- callouts ----------------------------------------------------------- */
+
+.callout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.callout h2 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.callout ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.callout li { margin-bottom: 0.2rem; }
+.callout.warn { border-left-color: var(--status-warning); }
+
+/* --- controls ----------------------------------------------------------- */
+
+/* Deliberately not sticky. The row worth keeping on screen while reading a
+ * three-hundred-row table is the one naming the columns, not the filter box --
+ * a filter is set once and then left alone, and two stacked bars eat the space
+ * the table header needs. */
+.controls {
+  z-index: 20;
+  background: var(--plane);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.controls input[type="search"] {
+  flex: 1 1 260px;
+  min-width: 200px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.controls button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.controls button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.controls .spacer { flex: 1 1 auto; }
+.controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* --- parts -------------------------------------------------------------- */
+
+/* The report is split into two parts that ask different things of the reader:
+ * rules that are the team's to decide on, and rules that merely cover them.
+ * The heading has to be unmistakably heavier than a section heading, or the
+ * distinction reads as one more table among the others. */
+
+h2.part {
+  font-size: 1.35rem;
+  margin: 2.5rem 0 0.15rem;
+  padding-top: 1.1rem;
+  border-top: 2px solid var(--baseline);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+p.part-lede {
+  color: var(--ink-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 1.25rem;
+}
+
+/* --- sections and tables ------------------------------------------------ */
+
+section.block { margin-bottom: 2rem; }
+
+section.block > h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* --- collapsible sections ------------------------------------------------ */
+
+h2.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+}
+
+button.collapse {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  align-self: center;
+}
+
+button.collapse:hover { color: var(--ink); }
+.chevron { display: inline-block; transition: transform 0.15s ease; }
+h2.section-head.collapsed .chevron { transform: rotate(-90deg); }
+
+.section-title { flex: 0 1 auto; }
+
+a.to-top {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.to-top:hover { color: var(--accent); }
+
+section.block > .lede {
+  color: var(--ink-secondary);
+  font-size: 0.88rem;
+  margin: 0 0 0.75rem;
+}
+
+.count-badge {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* No overflow, and that is the whole point.
+ *
+ * `overflow-x: auto` forces `overflow-y` to `auto` as well, which makes this
+ * element a scroll container -- and a sticky table header sticks to its nearest
+ * scroll container, not to the window. Since this box has no height limit it
+ * never scrolls vertically, so the header row had nothing to stick to and
+ * scrolled away with the rest of the table. Leaving the page as the scrollport
+ * is what makes the column names stay put.
+ *
+ * A rule table compresses to about 995px before its cells stop wrapping.
+ * Narrower than that the page itself scrolls sideways, which is the deliberate
+ * choice: an earlier version handed the overflow back to this element below
+ * 1080px, and every reader in a half-width window or at 175% zoom lost the
+ * column names without being told why. Keeping them is worth a horizontal
+ * scrollbar on a window too narrow for the table anyway. */
+.table-scroll {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* The asset and object lists sit above the rules, where they answer "is this
+ * report even about the right networks?" -- but an inventory generated from a
+ * network plan runs to hundreds of entries, and at full height it becomes a
+ * wall the reader has to scroll past before reaching a single rule. Capping it
+ * keeps the whole list available and the page navigable. This one *is* its own
+ * scrollport, so its header sticks to the top of the box instead. */
+.table-scroll.capped { max-height: 26rem; overflow-y: auto; }
+
+/* Wide content must not push the page sideways *above* the width at which the
+ * table stops fitting, so the wrapper is allowed to shrink with it. */
+.wrap { min-width: 0; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+/* The column names follow the reader down the table. --header-h is the height
+ * of the sticky page header, measured by the page itself; without the offset
+ * the header row would slide underneath it. It defaults to zero so that a page
+ * with no sticky header of its own -- the cross-team overview -- pins the
+ * column names to the top of the window rather than to thin air. */
+thead th {
+  position: sticky;
+  top: var(--header-h, 0px);
+  z-index: 5;
+  background: var(--surface);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  padding: 0.6rem 0.65rem;
+  border-bottom: 1px solid var(--baseline);
+  /* The line and the lift both matter. `border-collapse: collapse` hands the
+   * bottom border to whichever cell wins the collapse, so a scrolled-under row
+   * can take it and leave the header welded to the first line of data -- which
+   * is exactly how it looked. The first shadow redraws the rule unconditionally;
+   * the second casts the header over the rows passing beneath it, so it reads
+   * as a bar floating above the table instead of a row inside it. */
+  box-shadow: 0 1px 0 var(--baseline), 0 6px 8px -6px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+/* Inside a box that scrolls on its own -- the capped lists, and every table
+ * once the viewport is too narrow for the columns -- the header sticks to that
+ * box, so the page-header offset would push it down over the first rows. */
+.table-scroll.capped thead th { top: 0; }
+
+tbody td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--grid);
+  vertical-align: top;
+}
+
+tbody tr.rule-row:hover { background: var(--tint-neutral); }
+tbody tr.disabled td { color: var(--ink-muted); font-style: italic; }
+tbody tr.detail-row > td { background: var(--plane); padding: 0.9rem 1rem; }
+
+/* --- policy blocks ------------------------------------------------------ */
+
+/* Rules are grouped into the blocks the firewall evaluates as a unit, in the
+ * order it evaluates them. The heading row carries the block's position, the
+ * firewalls it reaches, and how many rules it holds in total -- the last one
+ * being what tells a reader that rules they are not shown sit between the
+ * ones they are. */
+
+tbody tr.scope-row > td {
+  background: var(--plane);
+  border-top: 2px solid var(--baseline);
+  border-bottom: 1px solid var(--baseline);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+tbody tr.scope-row:first-child > td { border-top: none; }
+
+.scope-step {
+  display: inline-block;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  line-height: 1.4rem;
+  text-align: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-right: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scope-title { font-weight: 600; margin-right: 0.6rem; }
+.scope-reach { color: var(--ink-secondary); margin-right: 0.6rem; }
+.scope-count { color: var(--ink-muted); font-size: 0.78rem; }
+
+td.pos {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  width: 3.5rem;
+}
+
+.why {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--grid);
+  font-size: 0.8rem;
+  color: var(--ink-secondary);
+}
+
+td.addr, td.svc {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  max-width: 340px;
+  word-break: break-word;
+}
+
+/* --- object names, addresses behind them --------------------------------- */
+
+/* A cell of resolved addresses is unreadable to everyone outside the network
+ * team and is not what a change request cites. The object name leads; the
+ * addresses live in the tooltip. The dotted underline is what says a tooltip
+ * is there -- without it nobody hovers. */
+td.objs {
+  max-width: 320px;
+  word-break: break-word;
+  font-size: 0.82rem;
+}
+
+.named {
+  border-bottom: 1px dotted var(--baseline);
+  cursor: help;
+}
+
+.named:hover { border-bottom-color: var(--accent); color: var(--accent); }
+
+.literal {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.more { color: var(--ink-muted); font-size: 0.78rem; }
+
+td.name { font-weight: 500; min-width: 180px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.toggle {
+  background: none;
+  border: none;
+  color: var(--link);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+/* --- badges: colour is always paired with an icon and a word ------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge .icon { font-size: 0.9em; line-height: 1; }
+
+.sev-high     { background: var(--tint-critical); border-color: var(--status-critical); }
+.sev-medium   { background: var(--tint-serious);  border-color: var(--status-serious); }
+.sev-low      { background: var(--tint-warning);  border-color: var(--status-warning); }
+.sev-info     { background: var(--tint-neutral);  border-color: var(--baseline); }
+
+/* A rule that blocks traffic must not read like one that permits it. This is
+ * the one badge that is loud on purpose. */
+.action-block {
+  background: var(--tint-critical);
+  border-color: var(--status-critical);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dir-inbound  { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-outbound { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-internal { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-related  { background: var(--tint-neutral); border-color: var(--baseline); }
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  font-size: 0.72rem;
+  color: var(--ink-secondary);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+
+.pill.mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+a { color: var(--link); }
+a.ticket { font-weight: 500; white-space: nowrap; }
+
+/* --- detail panel ------------------------------------------------------- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem 1.5rem;
+}
+
+.detail-grid dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  margin-bottom: 0.15rem;
+}
+
+.detail-grid dd {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.detail-grid dd.mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+/* A rule description is a change log, one entry per line. Collapsing the line
+ * breaks makes the ticket from one entry read as though it belonged to the
+ * date of the next. */
+.detail-grid dd.pre { white-space: pre-wrap; }
+
+.finding-item {
+  border-left: 3px solid var(--baseline);
+  padding: 0.35rem 0 0.35rem 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.finding-item.high   { border-left-color: var(--status-critical); }
+.finding-item.medium { border-left-color: var(--status-serious); }
+.finding-item.low    { border-left-color: var(--status-warning); }
+
+.finding-item .rec { color: var(--ink-secondary); font-size: 0.82rem; }
+
+.empty {
+  padding: 1.1rem;
+  text-align: center;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px dashed var(--baseline);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+}
+
+footer.report {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.hidden { display: none !important; }
+
+@media print {
+  .controls, .toggle { display: none !important; }
+  body { background: #fff; color: #000; font-size: 10pt; }
+  .table-scroll { overflow: visible; border: none; }
+  tbody tr { page-break-inside: avoid; }
+  section.block { page-break-before: auto; }
+}
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+<header class="report" id="page-header">
+  <div class="wrap">
+    <h1>Firewall Rule Review</h1>
+    <div class="subject">Overview across all teams · Example Corp</div>
+    <div class="provenance">
+      <span><b>Configuration:</b> example-estate.xml</span>
+<span><b>Backup from:</b> 2026-07-30 18:33</span>      <span><b>Generated:</b> 2026-07-30 18:33</span>
+<span><b>PAN-OS:</b> 11.1.0</span>      <span><b>Tool:</b> panorama-team-review 0.1.0</span>
+    </div>
+
+    <nav class="jump" aria-label="Sections of this report">
+      <a href="#s-teams">Teams</a>
+<a href="#s-scopes">Policy blocks</a><a href="#s-unassigned">Rules without an owner</a><a href="#s-findings">All findings</a>      <a href="#s-stats">Statistics</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tiles">
+    <div class="tile ">
+  <div class="value">112</div>
+  <div class="label">Rules analysed</div>
+</div>
+
+    <a class="tile " href="#s-teams">
+  <div class="value">5</div>
+  <div class="label">Teams with rules</div>
+<div class="hint">5 teams in the inventory</div>  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+    <a class="tile serious" href="#s-unassigned">
+  <div class="value">1</div>
+  <div class="label">Without an owner</div>
+<div class="hint">Inventory gaps, not unimportant rules</div>  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+    <a class="tile critical" href="#s-findings">
+  <div class="value">20</div>
+  <div class="label">High findings</div>
+  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+    <a class="tile " href="#s-findings">
+  <div class="value">122</div>
+  <div class="label">Findings total</div>
+  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+  </div>
+
+  <div class="callout warn">
+    <h2>Notes from this run</h2>
+    <ul><li>asset 10.20.1.7/32 of team &#39;reporting&#39; overlaps 10.20.0.0/16 of team &#39;payments&#39;</li></ul>
+  </div>
+
+  <section class="block" id="s-teams">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="teams" aria-expanded="true"
+          aria-controls="s-teams" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Teams</span>
+<span class="count-badge">5</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="teams">
+      <p class="lede">
+        One report was produced per team. <em>Own</em> counts the rules written for that team's
+        address space — the review workload. <em>Also covers</em> counts the estate-wide rules that
+        include them without being theirs; those carry no findings in a team's report, because the
+        team cannot act on them. They are all in <em>All findings</em> below, which is this team's
+        list, not theirs.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Team</th><th>Contact</th><th>Networks</th>
+            <th class="num">Inbound</th><th class="num">Outbound</th><th class="num">Both ends</th>
+            <th class="num">No direction</th><th class="num">Own total</th>
+            <th class="num">Also covers</th><th class="num">Findings</th><th>Worst</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="name">Platform Services<br><span class="pill mono">platform</span></td>
+              <td>platform@example.com</td>
+              <td class="num">2</td>
+              <td class="num">15</td>
+              <td class="num">14</td>
+              <td class="num">21</td>
+              <td class="num">19</td>
+              <td class="num">69</td>
+              <td class="num">9</td>
+              <td class="num">67</td>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+            </tr>
+            <tr>
+              <td class="name">Payments Platform<br><span class="pill mono">payments</span></td>
+              <td>payments@example.com</td>
+              <td class="num">2</td>
+              <td class="num">3</td>
+              <td class="num">10</td>
+              <td class="num">7</td>
+              <td class="num">33</td>
+              <td class="num">53</td>
+              <td class="num">5</td>
+              <td class="num">61</td>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+            </tr>
+            <tr>
+              <td class="name">DMZ Operations<br><span class="pill mono">dmz</span></td>
+              <td>dmz@example.com</td>
+              <td class="num">1</td>
+              <td class="num">3</td>
+              <td class="num">10</td>
+              <td class="num">7</td>
+              <td class="num">0</td>
+              <td class="num">20</td>
+              <td class="num">10</td>
+              <td class="num">18</td>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+            </tr>
+            <tr>
+              <td class="name">Development<br><span class="pill mono">development</span></td>
+              <td>dev@example.com</td>
+              <td class="num">1</td>
+              <td class="num">3</td>
+              <td class="num">10</td>
+              <td class="num">7</td>
+              <td class="num">0</td>
+              <td class="num">20</td>
+              <td class="num">10</td>
+              <td class="num">18</td>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+            </tr>
+            <tr>
+              <td class="name">Reporting Service<br><span class="pill mono">reporting</span></td>
+              <td>reporting@example.com</td>
+              <td class="num">1</td>
+              <td class="num">0</td>
+              <td class="num">0</td>
+              <td class="num">2</td>
+              <td class="num">0</td>
+              <td class="num">2</td>
+              <td class="num">14</td>
+              <td class="num">2</td>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span>              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="s-scopes">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="scopes" aria-expanded="true"
+          aria-controls="s-scopes" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Policy blocks in evaluation order</span>
+<span class="count-badge">12</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="scopes">
+      <p class="lede">
+        The order a firewall reads its policy in, derived from the device-group hierarchy: shared
+        pre-rules, then each device group from the top of the hierarchy down, then the firewall's
+        own rules, then post-rules the other way round. Every per-team report groups its rules into
+        these blocks. Blocks from sibling device groups are never evaluated by the same firewall,
+        so their relative order below is a stable listing rather than a sequence.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th class="num">Step</th><th>Block</th><th>Stage</th><th class="num">Rules</th><th>Applies to</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="num">1</td>
+              <td class="name">Shared — pre-rules<br><span class="pill mono">shared/pre</span></td>
+              <td><span class="pill">pre</span></td>
+              <td class="num">1</td>
+              <td>all 5 firewalls managed by this Panorama</td>
+            </tr>
+            <tr>
+              <td class="num">2</td>
+              <td class="name">DG-DMZ — pre-rules<br><span class="pill mono">DG-DMZ/pre</span></td>
+              <td><span class="pill">pre</span></td>
+              <td class="num">20</td>
+              <td>001901000003</td>
+            </tr>
+            <tr>
+              <td class="num">3</td>
+              <td class="name">DG-Production — pre-rules<br><span class="pill mono">DG-Production/pre</span></td>
+              <td><span class="pill">pre</span></td>
+              <td class="num">20</td>
+              <td>001901000001</td>
+            </tr>
+            <tr>
+              <td class="num">4</td>
+              <td class="name">DG-Shared-Services — pre-rules<br><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td><span class="pill">pre</span></td>
+              <td class="num">20</td>
+              <td>001901000000, 001901000002, 001901000004</td>
+            </tr>
+            <tr>
+              <td class="num">5</td>
+              <td class="name">DG-Development — pre-rules<br><span class="pill mono">DG-Development/pre</span></td>
+              <td><span class="pill">pre</span></td>
+              <td class="num">20</td>
+              <td>001901000002</td>
+            </tr>
+            <tr>
+              <td class="num">6</td>
+              <td class="name">DG-Partner — pre-rules<br><span class="pill mono">DG-Partner/pre</span></td>
+              <td><span class="pill">pre</span></td>
+              <td class="num">20</td>
+              <td>001901000004</td>
+            </tr>
+            <tr>
+              <td class="num">7</td>
+              <td class="name">DG-Development — post-rules<br><span class="pill mono">DG-Development/post</span></td>
+              <td><span class="pill">post</span></td>
+              <td class="num">2</td>
+              <td>001901000002</td>
+            </tr>
+            <tr>
+              <td class="num">8</td>
+              <td class="name">DG-Partner — post-rules<br><span class="pill mono">DG-Partner/post</span></td>
+              <td><span class="pill">post</span></td>
+              <td class="num">2</td>
+              <td>001901000004</td>
+            </tr>
+            <tr>
+              <td class="num">9</td>
+              <td class="name">DG-DMZ — post-rules<br><span class="pill mono">DG-DMZ/post</span></td>
+              <td><span class="pill">post</span></td>
+              <td class="num">2</td>
+              <td>001901000003</td>
+            </tr>
+            <tr>
+              <td class="num">10</td>
+              <td class="name">DG-Production — post-rules<br><span class="pill mono">DG-Production/post</span></td>
+              <td><span class="pill">post</span></td>
+              <td class="num">2</td>
+              <td>001901000001</td>
+            </tr>
+            <tr>
+              <td class="num">11</td>
+              <td class="name">DG-Shared-Services — post-rules<br><span class="pill mono">DG-Shared-Services/post</span></td>
+              <td><span class="pill">post</span></td>
+              <td class="num">2</td>
+              <td>001901000000, 001901000002, 001901000004</td>
+            </tr>
+            <tr>
+              <td class="num">12</td>
+              <td class="name">Shared — post-rules<br><span class="pill mono">shared/post</span></td>
+              <td><span class="pill">post</span></td>
+              <td class="num">1</td>
+              <td>all 5 firewalls managed by this Panorama</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="s-unassigned">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="unassigned" aria-expanded="true"
+          aria-controls="s-unassigned" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Rules without an owner</span>
+<span class="count-badge">1</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="unassigned">
+      <p class="lede">
+        No team could be determined for these rules. In almost every case this means the asset
+        inventory is incomplete rather than that the rules do not matter — this list is the best
+        guide to what the inventory is still missing. Expand one to see the object names and what
+        they resolve to, which is what says <em>whose</em> networks the inventory is missing.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Rule</th><th>Location</th><th>Source</th><th>Destination</th>
+            <th>Service</th><th>Ticket</th><th>Findings</th><th></th>
+          </tr></thead>
+          <tbody>
+            <tr class="rule-row" data-index="u0">
+              <td class="name">shared-deny-all <span class="badge action-block"><span class="icon" aria-hidden="true">⊘</span>deny</span>              </td>
+              <td><span class="pill mono">shared/post</span></td>
+              <td class="objs"><span class="literal">any</span></td>
+              <td class="objs"><span class="literal">any</span></td>
+              <td class="svc">any</td>
+              <td></td>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> </td>
+              <td><button class="toggle" data-toggle="u0" aria-expanded="false">details</button></td>
+            </tr>
+            <tr class="detail-row hidden" data-detail="u0">
+              <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">any &rarr; any</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd><span class="badge action-block"><span class="icon" aria-hidden="true">⊘</span>deny</span> traffic does not pass</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>shared/post, position 1</dd>
+  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">Explicit catch-all deny</dd>
+</div></dl>
+
+
+
+<div style="margin-top:0.6rem">
+  <div class="finding-item info">
+    <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>No change reference</strong>
+    <span class="pill mono">NO_TICKET</span>
+    <div>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</div>
+<div class="rec">Suggested action: Add the ticket reference to the description.</div>  </div>
+</div>
+
+</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="s-findings">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="findings" aria-expanded="true"
+          aria-controls="s-findings" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">All findings</span>
+<span class="count-badge">122</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="findings">
+      <p class="lede">
+        Every cleanup candidate across the estate, most significant first — including the ones on
+        rules that merely cover a team, which are deliberately absent from the per-team reports
+        because no owner could act on them. This is the firewall team's list.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Severity</th><th>Finding</th><th>Rule</th><th>Location</th><th>Detail</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">development-pre-04</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">development-pre-15</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">dmz-pre-04</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">dmz-pre-15</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">partner-pre-04</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">partner-pre-15</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">production-pre-04</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">production-pre-15</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">shared-services-pre-04</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Permits any source to any destination<br><span class="pill mono">ANY_ANY</span></td>
+              <td class="name">shared-services-pre-15</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Both source and destination are &#39;any&#39;, so this rule allows traffic between all systems the firewall sees.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">development-pre-08</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">development-pre-19</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">dmz-pre-08</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">dmz-pre-19</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">partner-pre-08</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">partner-pre-19</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">production-pre-08</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">production-pre-19</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">shared-services-pre-08</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
+              <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
+              <td class="name">shared-services-pre-19</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">development-pre-03</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">development-pre-14</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">dmz-pre-03</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">dmz-pre-14</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">partner-pre-03</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">partner-pre-14</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">production-pre-03</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">production-pre-14</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">shared-services-pre-03</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Destination is &#39;any&#39;<br><span class="pill mono">ANY_DESTINATION</span></td>
+              <td class="name">shared-services-pre-14</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The listed sources may reach any destination through this rule.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">development-pre-04</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">development-pre-15</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">dmz-pre-04</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">dmz-pre-15</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">partner-pre-04</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">partner-pre-15</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">production-pre-04</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">production-pre-15</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">shared-services-pre-04</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>No service or application restriction<br><span class="pill mono">ANY_SERVICE</span></td>
+              <td class="name">shared-services-pre-15</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Service is &#39;any&#39; and application is &#39;any&#39;, so every protocol and port is permitted.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">development-post-02</td>
+              <td><span class="pill mono">DG-Development/post</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">development-pre-02</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">development-pre-13</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">dmz-post-02</td>
+              <td><span class="pill mono">DG-DMZ/post</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">dmz-pre-02</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">dmz-pre-13</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">partner-post-02</td>
+              <td><span class="pill mono">DG-Partner/post</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">partner-pre-02</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">partner-pre-13</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">production-post-02</td>
+              <td><span class="pill mono">DG-Production/post</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">production-pre-02</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">production-pre-13</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">shared-allow-dns</td>
+              <td><span class="pill mono">shared/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">shared-services-post-02</td>
+              <td><span class="pill mono">DG-Shared-Services/post</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">shared-services-pre-02</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Source is &#39;any&#39;<br><span class="pill mono">ANY_SOURCE</span></td>
+              <td class="name">shared-services-pre-13</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Any system reaching this firewall may use this rule to access the listed destinations.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">development-pre-04</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">development-pre-15</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">dmz-pre-04</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">dmz-pre-15</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">partner-pre-04</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">partner-pre-15</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">production-pre-04</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">production-pre-15</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">shared-services-pre-04</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
+              <td>Traffic is not logged<br><span class="pill mono">NO_LOGGING</span></td>
+              <td class="name">shared-services-pre-15</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>Neither log-start nor log-end is set, so traffic matching this rule leaves no record.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">development-pre-09</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">development-pre-20</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">dmz-pre-09</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">dmz-pre-20</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">partner-pre-09</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">partner-pre-20</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">production-pre-09</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">production-pre-20</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">shared-services-pre-09</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-low"><span class="icon" aria-hidden="true">●</span>Low</span></td>
+              <td>No description<br><span class="pill mono">NO_DESCRIPTION</span></td>
+              <td class="name">shared-services-pre-20</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The rule has no description, so its purpose cannot be established from the configuration alone.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Disabled<br><span class="pill mono">DISABLED_RULE</span></td>
+              <td class="name">development-pre-10</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The rule is disabled and has no effect on traffic.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Disabled<br><span class="pill mono">DISABLED_RULE</span></td>
+              <td class="name">dmz-pre-10</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The rule is disabled and has no effect on traffic.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Disabled<br><span class="pill mono">DISABLED_RULE</span></td>
+              <td class="name">partner-pre-10</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The rule is disabled and has no effect on traffic.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Disabled<br><span class="pill mono">DISABLED_RULE</span></td>
+              <td class="name">production-pre-10</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The rule is disabled and has no effect on traffic.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Disabled<br><span class="pill mono">DISABLED_RULE</span></td>
+              <td class="name">shared-services-pre-10</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The rule is disabled and has no effect on traffic.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">development-post-01</td>
+              <td><span class="pill mono">DG-Development/post</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">development-pre-01</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">development-pre-06</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">development-pre-11</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">development-pre-16</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">dmz-post-01</td>
+              <td><span class="pill mono">DG-DMZ/post</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">dmz-pre-01</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">dmz-pre-06</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">dmz-pre-11</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">dmz-pre-16</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">partner-post-01</td>
+              <td><span class="pill mono">DG-Partner/post</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">partner-pre-01</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">partner-pre-06</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">partner-pre-11</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">partner-pre-16</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">production-post-01</td>
+              <td><span class="pill mono">DG-Production/post</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">production-pre-01</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">production-pre-06</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">production-pre-11</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">production-pre-16</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">shared-services-post-01</td>
+              <td><span class="pill mono">DG-Shared-Services/post</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">shared-services-pre-01</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">shared-services-pre-06</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">shared-services-pre-11</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">shared-services-pre-16</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">development-pre-05</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">development-pre-13</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">development-pre-17</td>
+              <td><span class="pill mono">DG-Development/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">dmz-pre-05</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">dmz-pre-13</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">dmz-pre-17</td>
+              <td><span class="pill mono">DG-DMZ/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">partner-pre-05</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">partner-pre-13</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">partner-pre-17</td>
+              <td><span class="pill mono">DG-Partner/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">production-pre-05</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">production-pre-13</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">production-pre-17</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">shared-deny-all</td>
+              <td><span class="pill mono">shared/post</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">shared-services-pre-05</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">shared-services-pre-13</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">shared-services-pre-17</td>
+              <td><span class="pill mono">DG-Shared-Services/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="s-stats">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="stats" aria-expanded="true"
+          aria-controls="s-stats" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Configuration statistics</span>
+  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="stats">
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Metric</th><th class="num">Value</th></tr></thead>
+          <tbody>
+            <tr><td>address groups</td><td class="num">17</td></tr>
+            <tr><td>address objects</td><td class="num">102</td></tr>
+            <tr><td>check ANY ANY</td><td class="num">10</td></tr>
+            <tr><td>check ANY DESTINATION</td><td class="num">10</td></tr>
+            <tr><td>check ANY SERVICE</td><td class="num">10</td></tr>
+            <tr><td>check ANY SOURCE</td><td class="num">16</td></tr>
+            <tr><td>check DISABLED RULE</td><td class="num">5</td></tr>
+            <tr><td>check EXPIRED RULE</td><td class="num">10</td></tr>
+            <tr><td>check EXPIRING SOON</td><td class="num">25</td></tr>
+            <tr><td>check NO DESCRIPTION</td><td class="num">10</td></tr>
+            <tr><td>check NO LOGGING</td><td class="num">10</td></tr>
+            <tr><td>check NO TICKET</td><td class="num">16</td></tr>
+            <tr><td>device groups</td><td class="num">5</td></tr>
+            <tr><td>findings high</td><td class="num">20</td></tr>
+            <tr><td>findings info</td><td class="num">46</td></tr>
+            <tr><td>findings low</td><td class="num">10</td></tr>
+            <tr><td>findings medium</td><td class="num">46</td></tr>
+            <tr><td>findings total</td><td class="num">122</td></tr>
+            <tr><td>nat rules</td><td class="num">0</td></tr>
+            <tr><td>rules analysed</td><td class="num">112</td></tr>
+            <tr><td>rules disabled</td><td class="num">5</td></tr>
+            <tr><td>rules total</td><td class="num">112</td></tr>
+            <tr><td>rules unassigned</td><td class="num">1</td></tr>
+            <tr><td>rules with tickets</td><td class="num">86</td></tr>
+            <tr><td>service objects</td><td class="num">6</td></tr>
+            <tr><td>team rules covering</td><td class="num">48</td></tr>
+            <tr><td>team rules own</td><td class="num">164</td></tr>
+            <tr><td>teams</td><td class="num">5</td></tr>
+            <tr><td>teams with rules</td><td class="num">5</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer class="report">
+    Generated by panorama-team-review 0.1.0 from
+    example-estate.xml    (sha256 36184e5eb65b9931…).
+    <a href="#top">Back to top ↑</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Same behaviour as a team report: a sticky header that shrinks, sections
+  // that collapse, and rules that expand. The overview is read the same way --
+  // scrolled through at length -- so it navigates the same way.
+  var header = document.getElementById("page-header");
+  function measure() {
+    if (!header) return;
+    document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  }
+  var COMPACT_FROM = 160;
+  var EXPAND_BELOW = 60;
+
+  if (header) {
+    window.addEventListener("scroll", function () {
+      var compact = header.classList.contains("compact");
+      if (!compact && window.scrollY > COMPACT_FROM) header.classList.add("compact");
+      else if (compact && window.scrollY < EXPAND_BELOW) header.classList.remove("compact");
+    }, { passive: true });
+
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(header);
+    else window.addEventListener("resize", measure);
+    measure();
+  }
+
+  function setCollapsed(button, collapsed) {
+    var id = button.getAttribute("data-collapse");
+    var body = document.querySelector('.collapsible[data-body="' + id + '"]');
+    if (!body) return;
+    body.classList.toggle("hidden", collapsed);
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var head = button.closest(".section-head");
+    if (head) head.classList.toggle("collapsed", collapsed);
+  }
+
+  document.querySelectorAll("button.collapse").forEach(function (button) {
+    button.addEventListener("click", function () {
+      setCollapsed(button, button.getAttribute("aria-expanded") === "true");
+    });
+  });
+
+  document.querySelectorAll('a[href^="#s-"]').forEach(function (link) {
+    link.addEventListener("click", function () {
+      var section = document.querySelector(link.getAttribute("href"));
+      if (!section) return;
+      var button = section.querySelector("button.collapse");
+      if (button && button.getAttribute("aria-expanded") === "false") setCollapsed(button, false);
+    });
+  });
+
+  var details = {};
+  document.querySelectorAll("tr.detail-row").forEach(function (row) {
+    details[row.getAttribute("data-detail")] = row;
+  });
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("button.toggle");
+    if (!button) return;
+    var detail = details[button.getAttribute("data-toggle")];
+    if (!detail) return;
+    var open = detail.classList.toggle("hidden");
+    button.setAttribute("aria-expanded", open ? "false" : "true");
+    button.textContent = open ? "details" : "hide";
+  });
+})();
+</script>
+</body>
+</html>

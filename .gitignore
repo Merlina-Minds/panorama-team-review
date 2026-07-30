@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------
+# Customer data must never enter this repository.
+# These directories are the designated place for real backups and real reports.
+# See docs/PRIVACY.md and tools/check_no_customer_data.py.
+# ---------------------------------------------------------------------------
+private/
+backups/
+out/
+reports/
+*.tgz
+*.tar.gz
+!tests/fixtures/**/*.tgz
+
+# The single exception, and it is safe by construction: everything under
+# example/ is produced by example/generate.py from tests/fixtures/generator.py,
+# which invents its own estate out of documentation address ranges,
+# example.com names and a reserved fake serial range. It is committed because
+# the point of it is to be read -- somebody deciding whether this tool is worth
+# installing should be able to open a finished report first.
+#
+# The directory re-include has to come before the contents: git cannot
+# re-include a file whose parent directory is still excluded.
+!example/backup/
+!example/backup/**
+!example/reports/
+!example/reports/**
+
+# Anything that looks like a real exported config
+running-config.xml
+*-running-config.xml
+candidate-config.xml
+*.pan-backup.xml
+Panorama*.tgz
+
+# Local configuration holding hostnames, API keys, inventory of real estates
+config/config.yaml
+config/inventory.yaml
+config/*.local.yaml
+.env
+*.key
+*.apikey
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

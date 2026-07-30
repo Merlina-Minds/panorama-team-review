@@ -1,0 +1,51 @@
+name: Update pre-commit hooks
+
+# Dependabot handles pip and GitHub Actions but not pre-commit hook revisions,
+# which are pinned in .pre-commit-config.yaml and would otherwise never move.
+# This closes that gap: once a week, bump them and open a pull request that has
+# to pass the full CI run like any other change.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autoupdate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install pre-commit
+
+      - name: Bump hook revisions
+        run: pre-commit autoupdate
+
+      - name: Verify the hooks still run
+        # An update that breaks the customer-data guard must not reach a PR
+        # looking green.
+        run: pre-commit run --all-files
+        continue-on-error: true
+
+      - uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "ci: bump pre-commit hook revisions"
+          branch: chore/pre-commit-autoupdate
+          delete-branch: true
+          title: "ci: bump pre-commit hook revisions"
+          body: |
+            Automated `pre-commit autoupdate`.
+
+            Check the CI run before merging -- a new ruff release can introduce
+            lint rules that fail the build.
+          labels: |
+            dependencies
+            ci

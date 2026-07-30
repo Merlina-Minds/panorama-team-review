@@ -1,0 +1,43 @@
+# flake8 / pycodestyle configuration.
+#
+# The project lints with ruff (see pyproject.toml), which is the authority.
+# This file exists so editors and any tooling that reaches for pycodestyle --
+# most IDE Python extensions do by default -- apply the same limits instead of
+# the 79-column default, which flags most of this codebase for no reason.
+#
+# Keep max-line-length in sync with [tool.ruff] line-length in pyproject.toml.
+
+[flake8]
+max-line-length = 120
+max-complexity = 15
+
+extend-ignore =
+    # Line length is enforced by the formatter, not by nagging; long lines that
+    # remain are deliberate (URLs, regexes, table-like literals).
+    E501,
+    # Whitespace before ':' -- conflicts with slice formatting.
+    E203,
+    # Line break before a binary operator -- the modern convention prefers it.
+    W503,
+
+exclude =
+    .git,
+    .venv,
+    venv,
+    __pycache__,
+    .pytest_cache,
+    .mypy_cache,
+    .ruff_cache,
+    build,
+    dist,
+    *.egg-info,
+    private,
+    backups,
+    out,
+    reports
+
+per-file-ignores =
+    # Test fixtures and conftest deliberately import for side effects and
+    # re-export, and the generator's data tables are wide by nature.
+    tests/conftest.py:E402,F401
+    tests/fixtures/generator.py:E501

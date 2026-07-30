@@ -1,0 +1,2066 @@
+{
+  "meta": {
+    "source_file": "example-estate.xml",
+    "source_files": [
+      "example-estate.xml"
+    ],
+    "source_type": "panorama",
+    "file_mtime": "2026-07-30T18:33:40.844357",
+    "parsed_at": "2026-07-30T18:33:41.917684",
+    "pan_os_version": "11.1.0",
+    "hostname": "panorama.example.com",
+    "tool_version": "0.1.0",
+    "config_hash": "36184e5eb65b9931d22fc0f1f1b8a99e2765e85e8b3b009df8fb94a73e248e30"
+  },
+  "generated_at": "2026-07-30T18:33:41.967479",
+  "hitcount_available": false,
+  "team": {
+    "team": {
+      "id": "reporting",
+      "name": "Reporting Service",
+      "contact": "reporting@example.com",
+      "description": "",
+      "assets": [
+        "10.20.1.7/32"
+      ],
+      "asset_labels": {
+        "10.20.1.7/32": "rpt-01 (reporting host, inside the payments network)"
+      },
+      "tags": [],
+      "device_groups": [],
+      "zones": [],
+      "name_patterns": []
+    },
+    "objects": [
+      {
+        "name": "production-host-03",
+        "kind": "object",
+        "scope": "DG-Production",
+        "description": "production application host 3",
+        "tags": [],
+        "networks": [
+          "10.20.1.7/32"
+        ],
+        "fqdns": []
+      }
+    ],
+    "inbound": [],
+    "outbound": [
+      {
+        "rule": {
+          "name": "production-pre-03",
+          "uuid": "0d985485-701c-cc83-b0e7-3782345fb32c",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 2,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "net-production"
+            ],
+            "networks": [
+              "10.20.0.0/16"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "net-production",
+                "networks": [
+                  "10.20.0.0/16"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "web-browsing"
+          ],
+          "services": {
+            "is_any": false,
+            "is_application_default": false,
+            "raw": [
+              "svc-https"
+            ],
+            "ports": [
+              "tcp/443"
+            ],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010014 standard access, requested by C. Placeholder, created 14.12.2025",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": true,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010014",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010014",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-12-14",
+                "raw": "14.12.2025",
+                "by": null
+              }
+            ],
+            "requester": "C. Placeholder"
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "outbound",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 23,
+        "coverage": "covered",
+        "coverage_reason": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+        "matched_assets": [
+          "10.20.1.7/32"
+        ],
+        "highlight_networks": [
+          "10.20.0.0/16"
+        ],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "inventory",
+            "confidence": 90,
+            "evidence": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+            "side": "source"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "production-pre-08",
+          "uuid": "6832c520-d93c-208c-33ff-392dc46e25d9",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 7,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "internal"
+          ],
+          "to_zones": [
+            "trust"
+          ],
+          "source": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "net-production"
+            ],
+            "networks": [
+              "10.20.0.0/16"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "net-production",
+                "networks": [
+                  "10.20.0.0/16"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "destination": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "partner-range"
+            ],
+            "networks": [
+              "198.51.100.10/31",
+              "198.51.100.12/30",
+              "198.51.100.16/30",
+              "198.51.100.20/32"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "partner-range",
+                "networks": [
+                  "198.51.100.10/31",
+                  "198.51.100.12/30",
+                  "198.51.100.16/30",
+                  "198.51.100.20/32"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "ssh"
+          ],
+          "services": {
+            "is_any": false,
+            "is_application_default": false,
+            "raw": [
+              "svc-ssh"
+            ],
+            "ports": [
+              "tcp/22"
+            ],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010049 temporary partner access, requested by B. Sample, valid until 13.06.2026",
+          "tags": [
+            "owner:platform",
+            "temporary"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": true,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010049",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010049",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "expires",
+                "value": "2026-06-13",
+                "raw": "13.06.2026",
+                "by": null
+              }
+            ],
+            "requester": "B. Sample"
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "outbound",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 28,
+        "coverage": "covered",
+        "coverage_reason": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+        "matched_assets": [
+          "10.20.1.7/32"
+        ],
+        "highlight_networks": [
+          "10.20.0.0/16"
+        ],
+        "peers": [
+          "198.51.100.10/31",
+          "198.51.100.12/30",
+          "198.51.100.16/30",
+          "198.51.100.20/32"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "inventory",
+            "confidence": 90,
+            "evidence": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+            "side": "source"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "production-pre-14",
+          "uuid": "92828cb0-f74f-b4a9-5e9d-a594c507356d",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 13,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "untrust"
+          ],
+          "to_zones": [
+            "dmz"
+          ],
+          "source": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "net-production"
+            ],
+            "networks": [
+              "10.20.0.0/16"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "net-production",
+                "networks": [
+                  "10.20.0.0/16"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "web-browsing"
+          ],
+          "services": {
+            "is_any": false,
+            "is_application_default": false,
+            "raw": [
+              "svc-https"
+            ],
+            "ports": [
+              "tcp/443"
+            ],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010091 standard access, requested by B. Sample, created 24.07.2025",
+          "tags": [
+            "owner:platform"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": true,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010091",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010091",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-07-24",
+                "raw": "24.07.2025",
+                "by": null
+              }
+            ],
+            "requester": "B. Sample"
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "outbound",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 34,
+        "coverage": "covered",
+        "coverage_reason": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+        "matched_assets": [
+          "10.20.1.7/32"
+        ],
+        "highlight_networks": [
+          "10.20.0.0/16"
+        ],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "inventory",
+            "confidence": 90,
+            "evidence": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+            "side": "source"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "production-pre-19",
+          "uuid": "9cada982-91f3-5883-602c-f3789bcc3513",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 18,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "net-production"
+            ],
+            "networks": [
+              "10.20.0.0/16"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "net-production",
+                "networks": [
+                  "10.20.0.0/16"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "destination": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "partner-range"
+            ],
+            "networks": [
+              "198.51.100.10/31",
+              "198.51.100.12/30",
+              "198.51.100.16/30",
+              "198.51.100.20/32"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "partner-range",
+                "networks": [
+                  "198.51.100.10/31",
+                  "198.51.100.12/30",
+                  "198.51.100.16/30",
+                  "198.51.100.20/32"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "ssh"
+          ],
+          "services": {
+            "is_any": false,
+            "is_application_default": false,
+            "raw": [
+              "svc-ssh"
+            ],
+            "ports": [
+              "tcp/22"
+            ],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010126 temporary partner access, requested by A. Example, valid until 13.06.2026",
+          "tags": [
+            "owner:payments",
+            "temporary"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": true,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010126",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010126",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "expires",
+                "value": "2026-06-13",
+                "raw": "13.06.2026",
+                "by": null
+              }
+            ],
+            "requester": "A. Example"
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "outbound",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 39,
+        "coverage": "covered",
+        "coverage_reason": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+        "matched_assets": [
+          "10.20.1.7/32"
+        ],
+        "highlight_networks": [
+          "10.20.0.0/16"
+        ],
+        "peers": [
+          "198.51.100.10/31",
+          "198.51.100.12/30",
+          "198.51.100.16/30",
+          "198.51.100.20/32"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "inventory",
+            "confidence": 90,
+            "evidence": "your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names",
+            "side": "source"
+          }
+        ],
+        "findings": []
+      }
+    ],
+    "internal": [
+      {
+        "rule": {
+          "name": "production-pre-06",
+          "uuid": "e8c796c8-e7af-d71d-a8ed-c658c4c8831e",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 5,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "untrust"
+          ],
+          "to_zones": [
+            "dmz"
+          ],
+          "source": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "grp-production-nested"
+            ],
+            "networks": [
+              "10.20.1.5/32",
+              "10.20.1.6/32",
+              "10.20.1.7/32"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "grp-production-nested",
+                "networks": [
+                  "10.20.1.5/32",
+                  "10.20.1.6/32",
+                  "10.20.1.7/32"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "destination": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "net-production"
+            ],
+            "networks": [
+              "10.20.0.0/16"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "net-production",
+                "networks": [
+                  "10.20.0.0/16"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": false,
+            "is_application_default": false,
+            "raw": [
+              "svc-grp-web"
+            ],
+            "ports": [
+              "tcp/443",
+              "tcp/8080",
+              "tcp/8443"
+            ],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010035 project access, requested by C. Placeholder, expires 27.08.2026",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": true,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010035",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010035",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "expires",
+                "value": "2026-08-27",
+                "raw": "27.08.2026",
+                "by": null
+              }
+            ],
+            "requester": "C. Placeholder"
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "internal",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 26,
+        "coverage": "own",
+        "coverage_reason": "the rule names your network 10.20.1.7/32 (rpt-01 (reporting host, inside the payments network))",
+        "matched_assets": [
+          "10.20.1.7/32"
+        ],
+        "highlight_networks": [
+          "10.20.1.7/32"
+        ],
+        "peers": [
+          "10.20.1.5/32",
+          "10.20.1.6/32",
+          "10.20.1.7/32",
+          "10.20.0.0/16"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "inventory",
+            "confidence": 90,
+            "evidence": "the rule names your network 10.20.1.7/32 (rpt-01 (reporting host, inside the payments network))",
+            "side": "both"
+          }
+        ],
+        "findings": [
+          {
+            "code": "EXPIRING_SOON",
+            "title": "Expires soon",
+            "severity": "info",
+            "rule_name": "production-pre-06",
+            "rule_uuid": "e8c796c8-e7af-d71d-a8ed-c658c4c8831e",
+            "location": "DG-Production/pre",
+            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "recommendation": "Confirm whether the access is still needed before it lapses.",
+            "teams": [
+              "reporting"
+            ]
+          }
+        ]
+      },
+      {
+        "rule": {
+          "name": "production-pre-17",
+          "uuid": "277254bb-740c-e230-ece1-83fe8e2ecdbd",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 16,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "trust"
+          ],
+          "to_zones": [
+            "untrust"
+          ],
+          "source": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "grp-production-nested"
+            ],
+            "networks": [
+              "10.20.1.5/32",
+              "10.20.1.6/32",
+              "10.20.1.7/32"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "grp-production-nested",
+                "networks": [
+                  "10.20.1.5/32",
+                  "10.20.1.6/32",
+                  "10.20.1.7/32"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "destination": {
+            "is_any": false,
+            "negated": false,
+            "raw": [
+              "net-production"
+            ],
+            "networks": [
+              "10.20.0.0/16"
+            ],
+            "fqdns": [],
+            "unresolved": [],
+            "members": [
+              {
+                "name": "net-production",
+                "networks": [
+                  "10.20.0.0/16"
+                ],
+                "fqdns": [],
+                "unresolved": []
+              }
+            ]
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": false,
+            "is_application_default": false,
+            "raw": [
+              "svc-grp-web"
+            ],
+            "ports": [
+              "tcp/443",
+              "tcp/8080",
+              "tcp/8443"
+            ],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "JIRA-2016 application access, created 2025-06-15",
+          "tags": [
+            "owner:platform"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": true,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-06-15",
+                "raw": "2025-06-15",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "internal",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 37,
+        "coverage": "own",
+        "coverage_reason": "the rule names your network 10.20.1.7/32 (rpt-01 (reporting host, inside the payments network))",
+        "matched_assets": [
+          "10.20.1.7/32"
+        ],
+        "highlight_networks": [
+          "10.20.1.7/32"
+        ],
+        "peers": [
+          "10.20.1.5/32",
+          "10.20.1.6/32",
+          "10.20.1.7/32",
+          "10.20.0.0/16"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "inventory",
+            "confidence": 90,
+            "evidence": "the rule names your network 10.20.1.7/32 (rpt-01 (reporting host, inside the payments network))",
+            "side": "both"
+          }
+        ],
+        "findings": [
+          {
+            "code": "NO_TICKET",
+            "title": "No change reference",
+            "severity": "info",
+            "rule_name": "production-pre-17",
+            "rule_uuid": "277254bb-740c-e230-ece1-83fe8e2ecdbd",
+            "location": "DG-Production/pre",
+            "detail": "The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.",
+            "recommendation": "Add the ticket reference to the description.",
+            "teams": [
+              "reporting"
+            ]
+          }
+        ]
+      }
+    ],
+    "related": [
+      {
+        "rule": {
+          "name": "dmz-pre-04",
+          "uuid": "e16e76b2-ebff-3140-e61b-e4118cbc6c66",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-DMZ",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 3,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "internal"
+          ],
+          "to_zones": [
+            "trust"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010021 broad rule pending replacement, created 01.12.2025",
+          "tags": [
+            "owner:payments"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010021",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-12-01",
+                "raw": "01.12.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-DMZ/pre",
+        "evaluation_rank": 4,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "dmz-pre-15",
+          "uuid": "49e7f107-97af-17f9-728a-974d04e75959",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-DMZ",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 14,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010098 broad rule pending replacement, created 11.07.2025",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010098",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-07-11",
+                "raw": "11.07.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-DMZ/pre",
+        "evaluation_rank": 15,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "production-pre-04",
+          "uuid": "165af064-7c57-0fc4-a874-674a1d163b90",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 3,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "internal"
+          ],
+          "to_zones": [
+            "trust"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010021 broad rule pending replacement, created 01.12.2025",
+          "tags": [
+            "owner:payments"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010021",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-12-01",
+                "raw": "01.12.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 24,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "production-pre-15",
+          "uuid": "4b303d98-7425-14a1-22ec-3399388660cf",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Production",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 14,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010098 broad rule pending replacement, created 11.07.2025",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010098",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-07-11",
+                "raw": "11.07.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Production/pre",
+        "evaluation_rank": 35,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "shared-services-pre-04",
+          "uuid": "adfeb295-51c8-7ab3-3966-210abfdbae66",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Shared-Services",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 3,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "internal"
+          ],
+          "to_zones": [
+            "trust"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010021 broad rule pending replacement, created 01.12.2025",
+          "tags": [
+            "owner:payments"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010021",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-12-01",
+                "raw": "01.12.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Shared-Services/pre",
+        "evaluation_rank": 44,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "shared-services-pre-15",
+          "uuid": "bb747976-6f29-8181-3e7a-865979da58ab",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Shared-Services",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 14,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010098 broad rule pending replacement, created 11.07.2025",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010098",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-07-11",
+                "raw": "11.07.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Shared-Services/pre",
+        "evaluation_rank": 55,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "development-pre-04",
+          "uuid": "86926070-12cd-6bee-335f-fb7793604cc0",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Development",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 3,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "internal"
+          ],
+          "to_zones": [
+            "trust"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010021 broad rule pending replacement, created 01.12.2025",
+          "tags": [
+            "owner:payments"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010021",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-12-01",
+                "raw": "01.12.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Development/pre",
+        "evaluation_rank": 64,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "development-pre-15",
+          "uuid": "b71f9ff1-75e5-c59d-83ab-7b676fe74c49",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Development",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 14,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010098 broad rule pending replacement, created 11.07.2025",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010098",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-07-11",
+                "raw": "11.07.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Development/pre",
+        "evaluation_rank": 75,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "partner-pre-04",
+          "uuid": "a1253860-f3c7-3897-67c1-a1941412e913",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Partner",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 3,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "internal"
+          ],
+          "to_zones": [
+            "trust"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010021 broad rule pending replacement, created 01.12.2025",
+          "tags": [
+            "owner:payments"
+          ],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010021",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-12-01",
+                "raw": "01.12.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Partner/pre",
+        "evaluation_rank": 84,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      },
+      {
+        "rule": {
+          "name": "partner-pre-15",
+          "uuid": "91beae9f-1d76-0060-ac13-c18980ac0421",
+          "location": {
+            "source": "example-estate.xml",
+            "kind": "panorama",
+            "device": null,
+            "device_group": "DG-Partner",
+            "vsys": null,
+            "shared": false,
+            "rulebase": "pre"
+          },
+          "order": 14,
+          "disabled": false,
+          "action": "allow",
+          "rule_type": "universal",
+          "from_zones": [
+            "dmz"
+          ],
+          "to_zones": [
+            "internal"
+          ],
+          "source": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "destination": {
+            "is_any": true,
+            "negated": false,
+            "raw": [],
+            "networks": [],
+            "fqdns": [],
+            "unresolved": [],
+            "members": []
+          },
+          "source_users": [
+            "any"
+          ],
+          "applications": [
+            "any"
+          ],
+          "services": {
+            "is_any": true,
+            "is_application_default": false,
+            "raw": [],
+            "ports": [],
+            "unresolved": []
+          },
+          "categories": [
+            "any"
+          ],
+          "description": "CHG0010098 broad rule pending replacement, created 11.07.2025",
+          "tags": [],
+          "group_tag": null,
+          "schedule": null,
+          "log_start": false,
+          "log_end": false,
+          "profile_group": "default-profiles",
+          "metadata": {
+            "tickets": [
+              {
+                "system": "servicenow",
+                "id": "CHG0010098",
+                "url": "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098",
+                "source_field": "description"
+              }
+            ],
+            "dates": [
+              {
+                "role": "created",
+                "value": "2025-07-11",
+                "raw": "11.07.2025",
+                "by": null
+              }
+            ],
+            "requester": null
+          },
+          "hits": null,
+          "target_devices": []
+        },
+        "direction": "related",
+        "scope_id": "DG-Partner/pre",
+        "evaluation_rank": 95,
+        "coverage": "covered",
+        "coverage_reason": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+        "matched_assets": [],
+        "highlight_networks": [],
+        "peers": [
+          "any"
+        ],
+        "peer_teams": [],
+        "matches": [
+          {
+            "team_id": "reporting",
+            "method": "fallback",
+            "confidence": 10,
+            "evidence": "the rule permits any source to any destination, so it covers this team's networks along with every other",
+            "side": "rule"
+          }
+        ],
+        "findings": []
+      }
+    ],
+    "findings": [
+      {
+        "code": "EXPIRING_SOON",
+        "title": "Expires soon",
+        "severity": "info",
+        "rule_name": "production-pre-06",
+        "rule_uuid": "e8c796c8-e7af-d71d-a8ed-c658c4c8831e",
+        "location": "DG-Production/pre",
+        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "recommendation": "Confirm whether the access is still needed before it lapses.",
+        "teams": [
+          "reporting"
+        ]
+      },
+      {
+        "code": "NO_TICKET",
+        "title": "No change reference",
+        "severity": "info",
+        "rule_name": "production-pre-17",
+        "rule_uuid": "277254bb-740c-e230-ece1-83fe8e2ecdbd",
+        "location": "DG-Production/pre",
+        "detail": "The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.",
+        "recommendation": "Add the ticket reference to the description.",
+        "teams": [
+          "reporting"
+        ]
+      }
+    ]
+  }
+}

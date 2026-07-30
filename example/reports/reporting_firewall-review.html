@@ -1,0 +1,2326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firewall Rule Review — Reporting Service</title>
+<style>/* Report styling.
+ *
+ * Colour is used for status only, never as the sole carrier of meaning: every
+ * severity and direction badge pairs its colour with an icon and a word, so the
+ * report stays readable in greyscale print, in forced-colours mode, and for
+ * readers with colour vision deficiency.
+ *
+ * Status steps and ink tokens follow a validated palette; both light and dark
+ * are stepped deliberately rather than flipped.
+ */
+
+:root {
+  --surface: #fcfcfb;
+  --plane: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+
+  --status-critical: #d03b3b;
+  --status-serious: #ec835a;
+  --status-warning: #fab219;
+  --status-good: #0ca30c;
+
+  --tint-critical: rgba(208, 59, 59, 0.10);
+  --tint-serious: rgba(236, 131, 90, 0.12);
+  --tint-warning: rgba(250, 178, 25, 0.14);
+  --tint-neutral: rgba(137, 135, 129, 0.10);
+
+  --accent: #1f3864;
+  --link: #0563c1;
+
+  --radius: 6px;
+  --gap: 1rem;
+}
+
+/* Dark mode is a deliberate second set of steps, not an inversion of the first.
+ *
+ * The same complete set is applied twice: once for viewers whose system asks
+ * for dark, and once for viewers who pressed the theme button. Both must carry
+ * *every* token -- an earlier version listed only the surfaces here, which left
+ * the light-surface status tints on a dark background where they were nearly
+ * invisible.
+ *
+ * The :not([data-theme="light"]) guard is what lets the button override a dark
+ * system preference; without it the toggle would only work in one direction. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #1a1a19;
+    --plane: #0d0d0d;
+    --ink: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --tint-critical: rgba(208, 59, 59, 0.22);
+    --tint-serious: rgba(236, 131, 90, 0.20);
+    --tint-warning: rgba(250, 178, 25, 0.18);
+    --tint-neutral: rgba(195, 194, 183, 0.10);
+    --accent: #93b4ea;
+    --link: #7fb4f5;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: #1a1a19;
+  --plane: #0d0d0d;
+  --ink: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --tint-critical: rgba(208, 59, 59, 0.22);
+  --tint-serious: rgba(236, 131, 90, 0.20);
+  --tint-warning: rgba(250, 178, 25, 0.18);
+  --tint-neutral: rgba(195, 194, 183, 0.10);
+  --accent: #93b4ea;
+  --link: #7fb4f5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 4rem;
+  background: var(--plane);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* --- header ------------------------------------------------------------- */
+
+/* The header stays at the top of the window. Once a three-hundred-row table
+ * has scrolled the title away there is nothing left saying whose report this
+ * is, which matters most when several are open side by side. It shrinks to one
+ * line as soon as the page moves, so the cost is a few pixels rather than a
+ * banner permanently occupying a fifth of the screen. */
+header.report {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1.75rem 0 1rem;
+  margin-bottom: 1.5rem;
+  transition: padding 0.15s ease;
+}
+
+header.report h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+  transition: font-size 0.15s ease;
+}
+
+header.report .subject {
+  font-size: 1.05rem;
+  color: var(--ink-secondary);
+  margin-bottom: 0.75rem;
+}
+
+header.report.compact { padding: 0.5rem 0 0.4rem; }
+header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
+header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
+header.report.compact .provenance { display: none; }
+header.report.compact nav.jump { margin-top: 0.35rem; }
+
+.provenance {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+
+.provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- jump navigation ----------------------------------------------------- */
+
+nav.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.75rem;
+}
+
+nav.jump a {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Anchors have to clear the sticky header, or a jump link lands with its
+ * heading hidden behind it. */
+section.block, h2.part { scroll-margin-top: calc(var(--header-h, 5rem) + 1rem); }
+
+/* --- stat tiles --------------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  position: relative;
+  display: block;
+}
+
+/* A tile that counts something links to the section holding it. */
+a.tile { text-decoration: none; color: inherit; }
+a.tile:hover { border-color: var(--accent); }
+a.tile:hover .value { color: var(--accent); }
+
+.tile-go {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+a.tile:hover .tile-go { color: var(--accent); }
+
+.tile .value {
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile .label {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.2rem;
+}
+
+.tile .hint { font-size: 0.78rem; color: var(--ink-secondary); margin-top: 0.35rem; }
+.tile.critical { border-left: 3px solid var(--status-critical); }
+.tile.serious  { border-left: 3px solid var(--status-serious); }
+
+/* --- callouts ----------------------------------------------------------- */
+
+.callout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.callout h2 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.callout ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.callout li { margin-bottom: 0.2rem; }
+.callout.warn { border-left-color: var(--status-warning); }
+
+/* --- controls ----------------------------------------------------------- */
+
+/* Deliberately not sticky. The row worth keeping on screen while reading a
+ * three-hundred-row table is the one naming the columns, not the filter box --
+ * a filter is set once and then left alone, and two stacked bars eat the space
+ * the table header needs. */
+.controls {
+  z-index: 20;
+  background: var(--plane);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.controls input[type="search"] {
+  flex: 1 1 260px;
+  min-width: 200px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.controls button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.controls button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.controls .spacer { flex: 1 1 auto; }
+.controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* --- parts -------------------------------------------------------------- */
+
+/* The report is split into two parts that ask different things of the reader:
+ * rules that are the team's to decide on, and rules that merely cover them.
+ * The heading has to be unmistakably heavier than a section heading, or the
+ * distinction reads as one more table among the others. */
+
+h2.part {
+  font-size: 1.35rem;
+  margin: 2.5rem 0 0.15rem;
+  padding-top: 1.1rem;
+  border-top: 2px solid var(--baseline);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+p.part-lede {
+  color: var(--ink-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 1.25rem;
+}
+
+/* --- sections and tables ------------------------------------------------ */
+
+section.block { margin-bottom: 2rem; }
+
+section.block > h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* --- collapsible sections ------------------------------------------------ */
+
+h2.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+}
+
+button.collapse {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  align-self: center;
+}
+
+button.collapse:hover { color: var(--ink); }
+.chevron { display: inline-block; transition: transform 0.15s ease; }
+h2.section-head.collapsed .chevron { transform: rotate(-90deg); }
+
+.section-title { flex: 0 1 auto; }
+
+a.to-top {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.to-top:hover { color: var(--accent); }
+
+section.block > .lede {
+  color: var(--ink-secondary);
+  font-size: 0.88rem;
+  margin: 0 0 0.75rem;
+}
+
+.count-badge {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* No overflow, and that is the whole point.
+ *
+ * `overflow-x: auto` forces `overflow-y` to `auto` as well, which makes this
+ * element a scroll container -- and a sticky table header sticks to its nearest
+ * scroll container, not to the window. Since this box has no height limit it
+ * never scrolls vertically, so the header row had nothing to stick to and
+ * scrolled away with the rest of the table. Leaving the page as the scrollport
+ * is what makes the column names stay put.
+ *
+ * A rule table compresses to about 995px before its cells stop wrapping.
+ * Narrower than that the page itself scrolls sideways, which is the deliberate
+ * choice: an earlier version handed the overflow back to this element below
+ * 1080px, and every reader in a half-width window or at 175% zoom lost the
+ * column names without being told why. Keeping them is worth a horizontal
+ * scrollbar on a window too narrow for the table anyway. */
+.table-scroll {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* The asset and object lists sit above the rules, where they answer "is this
+ * report even about the right networks?" -- but an inventory generated from a
+ * network plan runs to hundreds of entries, and at full height it becomes a
+ * wall the reader has to scroll past before reaching a single rule. Capping it
+ * keeps the whole list available and the page navigable. This one *is* its own
+ * scrollport, so its header sticks to the top of the box instead. */
+.table-scroll.capped { max-height: 26rem; overflow-y: auto; }
+
+/* Wide content must not push the page sideways *above* the width at which the
+ * table stops fitting, so the wrapper is allowed to shrink with it. */
+.wrap { min-width: 0; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+/* The column names follow the reader down the table. --header-h is the height
+ * of the sticky page header, measured by the page itself; without the offset
+ * the header row would slide underneath it. It defaults to zero so that a page
+ * with no sticky header of its own -- the cross-team overview -- pins the
+ * column names to the top of the window rather than to thin air. */
+thead th {
+  position: sticky;
+  top: var(--header-h, 0px);
+  z-index: 5;
+  background: var(--surface);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  padding: 0.6rem 0.65rem;
+  border-bottom: 1px solid var(--baseline);
+  /* The line and the lift both matter. `border-collapse: collapse` hands the
+   * bottom border to whichever cell wins the collapse, so a scrolled-under row
+   * can take it and leave the header welded to the first line of data -- which
+   * is exactly how it looked. The first shadow redraws the rule unconditionally;
+   * the second casts the header over the rows passing beneath it, so it reads
+   * as a bar floating above the table instead of a row inside it. */
+  box-shadow: 0 1px 0 var(--baseline), 0 6px 8px -6px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+/* Inside a box that scrolls on its own -- the capped lists, and every table
+ * once the viewport is too narrow for the columns -- the header sticks to that
+ * box, so the page-header offset would push it down over the first rows. */
+.table-scroll.capped thead th { top: 0; }
+
+tbody td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--grid);
+  vertical-align: top;
+}
+
+tbody tr.rule-row:hover { background: var(--tint-neutral); }
+tbody tr.disabled td { color: var(--ink-muted); font-style: italic; }
+tbody tr.detail-row > td { background: var(--plane); padding: 0.9rem 1rem; }
+
+/* --- policy blocks ------------------------------------------------------ */
+
+/* Rules are grouped into the blocks the firewall evaluates as a unit, in the
+ * order it evaluates them. The heading row carries the block's position, the
+ * firewalls it reaches, and how many rules it holds in total -- the last one
+ * being what tells a reader that rules they are not shown sit between the
+ * ones they are. */
+
+tbody tr.scope-row > td {
+  background: var(--plane);
+  border-top: 2px solid var(--baseline);
+  border-bottom: 1px solid var(--baseline);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+tbody tr.scope-row:first-child > td { border-top: none; }
+
+.scope-step {
+  display: inline-block;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  line-height: 1.4rem;
+  text-align: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-right: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scope-title { font-weight: 600; margin-right: 0.6rem; }
+.scope-reach { color: var(--ink-secondary); margin-right: 0.6rem; }
+.scope-count { color: var(--ink-muted); font-size: 0.78rem; }
+
+td.pos {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  width: 3.5rem;
+}
+
+.why {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--grid);
+  font-size: 0.8rem;
+  color: var(--ink-secondary);
+}
+
+td.addr, td.svc {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  max-width: 340px;
+  word-break: break-word;
+}
+
+/* --- object names, addresses behind them --------------------------------- */
+
+/* A cell of resolved addresses is unreadable to everyone outside the network
+ * team and is not what a change request cites. The object name leads; the
+ * addresses live in the tooltip. The dotted underline is what says a tooltip
+ * is there -- without it nobody hovers. */
+td.objs {
+  max-width: 320px;
+  word-break: break-word;
+  font-size: 0.82rem;
+}
+
+.named {
+  border-bottom: 1px dotted var(--baseline);
+  cursor: help;
+}
+
+.named:hover { border-bottom-color: var(--accent); color: var(--accent); }
+
+.literal {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.more { color: var(--ink-muted); font-size: 0.78rem; }
+
+td.name { font-weight: 500; min-width: 180px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.toggle {
+  background: none;
+  border: none;
+  color: var(--link);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+/* --- badges: colour is always paired with an icon and a word ------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge .icon { font-size: 0.9em; line-height: 1; }
+
+.sev-high     { background: var(--tint-critical); border-color: var(--status-critical); }
+.sev-medium   { background: var(--tint-serious);  border-color: var(--status-serious); }
+.sev-low      { background: var(--tint-warning);  border-color: var(--status-warning); }
+.sev-info     { background: var(--tint-neutral);  border-color: var(--baseline); }
+
+/* A rule that blocks traffic must not read like one that permits it. This is
+ * the one badge that is loud on purpose. */
+.action-block {
+  background: var(--tint-critical);
+  border-color: var(--status-critical);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dir-inbound  { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-outbound { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-internal { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-related  { background: var(--tint-neutral); border-color: var(--baseline); }
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  font-size: 0.72rem;
+  color: var(--ink-secondary);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+
+.pill.mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+a { color: var(--link); }
+a.ticket { font-weight: 500; white-space: nowrap; }
+
+/* --- detail panel ------------------------------------------------------- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem 1.5rem;
+}
+
+.detail-grid dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  margin-bottom: 0.15rem;
+}
+
+.detail-grid dd {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.detail-grid dd.mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+/* A rule description is a change log, one entry per line. Collapsing the line
+ * breaks makes the ticket from one entry read as though it belonged to the
+ * date of the next. */
+.detail-grid dd.pre { white-space: pre-wrap; }
+
+.finding-item {
+  border-left: 3px solid var(--baseline);
+  padding: 0.35rem 0 0.35rem 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.finding-item.high   { border-left-color: var(--status-critical); }
+.finding-item.medium { border-left-color: var(--status-serious); }
+.finding-item.low    { border-left-color: var(--status-warning); }
+
+.finding-item .rec { color: var(--ink-secondary); font-size: 0.82rem; }
+
+.empty {
+  padding: 1.1rem;
+  text-align: center;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px dashed var(--baseline);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+}
+
+footer.report {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.hidden { display: none !important; }
+
+@media print {
+  .controls, .toggle { display: none !important; }
+  body { background: #fff; color: #000; font-size: 10pt; }
+  .table-scroll { overflow: visible; border: none; }
+  tbody tr { page-break-inside: avoid; }
+  section.block { page-break-before: auto; }
+}
+</style>
+</head>
+<body>
+<a id="top"></a>
+
+
+<header class="report" id="page-header">
+  <div class="wrap">
+    <h1>Firewall Rule Review</h1>
+    <div class="subject">Reporting Service · reporting@example.com</div>
+    <div class="provenance">
+      <span><b>Configuration:</b> example-estate.xml</span>
+<span><b>Backup from:</b> 2026-07-30 18:33</span>      <span><b>Report generated:</b> 2026-07-30 18:33</span>
+      <span><b>Tool:</b> panorama-team-review 0.1.0</span>
+    </div>
+
+    <nav class="jump" aria-label="Sections of this report">
+<a href="#s-networks">Your networks</a><a href="#s-objects">Objects &amp; groups</a><a href="#s-own-internal">Both ends yours</a><a href="#s-covered-outbound">Also covers: outbound</a><a href="#s-covered-other">Also covers: other</a><a href="#s-findings">Cleanup candidates</a>    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tiles">
+    <a class="tile " href="#s-networks">
+  <div class="value">1</div>
+  <div class="label">Your networks</div>
+<div class="hint">From the asset inventory</div>  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+    <div class="tile ">
+  <div class="value">0</div>
+  <div class="label">Inbound</div>
+<div class="hint">Who reaches your networks</div></div>
+
+    <div class="tile ">
+  <div class="value">0</div>
+  <div class="label">Outbound</div>
+<div class="hint">What your networks reach</div></div>
+
+    <a class="tile " href="#s-covered-outbound">
+  <div class="value">14</div>
+  <div class="label">Also cover you</div>
+<div class="hint">Central rules, nothing to do</div>  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+    <a class="tile " href="#s-findings">
+  <div class="value">2</div>
+  <div class="label">Cleanup candidates</div>
+<div class="hint">Nothing urgent</div>  <span class="tile-go" aria-hidden="true">↓</span>
+</a>
+
+  </div>
+
+  <div class="callout">
+    <h2>How to read this report</h2>
+    <p style="margin:0 0 0.5rem">
+      This report contains two kinds of rule, and only the first kind is a question to you.
+    </p>
+    <ul>
+      <li>
+        <strong>Your rules</strong> — rules written for your address space: something in the rule
+        names one of your networks, or carries your team's tag or zone. You are the one who can
+        say whether they are still needed.
+        <ul>
+          <li><strong>Inbound</strong> — other systems may reach yours. Read these first: they are your exposure.</li>
+          <li><strong>Outbound</strong> — your systems may reach elsewhere.</li>
+          <li><strong>Both ends yours</strong> — source and destination are both networks of yours, so the traffic stays inside your own address space.</li>
+          <li><strong>No direction</strong> — attributed to your team by tag, name or device group, which does not say which side you are on.</li>
+        </ul>
+      </li>
+      <li>
+        <strong>Rules that also cover your networks</strong> — estate-wide rules that happen to
+        include you: ping, DNS, Active Directory and the like. Your networks sit inside a much
+        larger one the rule names. <strong>Nothing is being asked of you here.</strong> They are
+        listed so you can see the access you already have — there is no need to request it — and
+        so you can speak up if one of your systems must <em>not</em> have it.
+      </li>
+    </ul>
+    <p style="margin:0.6rem 0 0">
+      Addresses are shown by <strong>name</strong>, because the name is what a change request has
+      to cite. Hold the mouse over one to see the networks and addresses behind it.
+    </p>
+    <p style="margin:0.6rem 0 0">
+      Rules are listed in the order the firewall evaluates them, grouped into the blocks it
+      evaluates as a unit. The first matching rule wins, so a rule above another can make it
+      irrelevant. Each block says which firewalls it applies to and how many rules it holds in
+      total, so you can see that rules you are not shown sit between the ones you are.
+    </p>
+    <p style="margin:0.6rem 0 0">
+      Expand any rule with <em>details</em> for the exact object names, the resolved networks,
+      the ports, and why the rule is in your report. Every section heading collapses.
+Questions about a rule, or need one changed? Raise a ticket with the firewall team and quote the rule name and its location.    </p>
+  </div>
+
+  <div class="callout warn">
+    <h2>Usage data not included</h2>
+    <p style="margin:0">
+      Rule hit counters are runtime state and are not part of a configuration backup, so this
+      report cannot say how often a rule matched. Statements about unused rules are therefore
+      absent rather than guessed. Hit counts can be collected separately by enabling the
+      optional enrichment module.
+    </p>
+  </div>
+
+  <section class="block" id="s-networks">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="networks" aria-expanded="true"
+          aria-controls="s-networks" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Your networks</span>
+<span class="count-badge">1 network</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="networks">
+      <p class="lede">
+        What this report considers yours, and how many of your own rules touch each. Everything
+        below follows from this list — if a network is missing or does not belong to you, tell the
+        firewall team, because the rest of the report will be wrong in the same way.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Network</th><th>System</th><th class="num">Inbound</th><th class="num">Outbound</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="addr">10.20.1.7/32</td>
+              <td>rpt-01 (reporting host, inside the payments network)</td>
+              <td class="num">0</td>
+              <td class="num">0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="s-objects">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="objects" aria-expanded="true"
+          aria-controls="s-objects" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Objects and groups inside your networks</span>
+<span class="count-badge">1</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="objects">
+      <p class="lede">
+        What your networks are called in the firewall. Every address object and group whose
+        addresses lie entirely within your networks — these are the names to quote when you ask
+        for a rule to be changed, and the names you will see in the rules below.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Name</th><th>Kind</th><th>Defined in</th><th>Covers</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="name mono">production-host-03</td>
+              <td><span class="pill">object</span></td>
+              <td><span class="pill mono">DG-Production</span></td>
+              <td class="addr">10.20.1.7/32</td>
+              <td>production application host 3              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="controls">
+    <input type="search" id="filter" placeholder="Filter by rule name, address, port, ticket…" aria-label="Filter rules">
+    <button data-severity="high" aria-pressed="false">▲ High</button>
+    <button data-severity="medium" aria-pressed="false">◆ Medium</button>
+    <button data-severity="low" aria-pressed="false">● Low</button>
+    <button id="clear">Clear</button>
+    <span class="spacer"></span>
+    <span class="count" id="count"></span>
+    <button id="collapse-all">⊟ Collapse all</button>
+    <button id="theme" title="Switch between light and dark">◐ Theme</button>
+  </div>
+
+  <h2 class="part">Your rules <span class="count-badge">2</span></h2>
+  <p class="part-lede">
+    Written for your address space. These are the ones to decide on.
+  </p>
+
+
+  <section class="block" data-section="own-inbound" id="s-own-inbound">
+  <h2 class="section-head">
+  <button class="collapse" data-collapse="own-inbound" aria-expanded="true"
+          aria-controls="s-own-inbound" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Inbound — who reaches your networks</span>
+<span class="count-badge">0 rules</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+  <div class="collapsible" data-body="own-inbound">
+  <p class="lede">Traffic from elsewhere that is permitted to reach the networks you own.</p>
+  <div class="empty">No rules in this category.</div>
+  </div>
+</section>
+
+
+  <section class="block" data-section="own-outbound" id="s-own-outbound">
+  <h2 class="section-head">
+  <button class="collapse" data-collapse="own-outbound" aria-expanded="true"
+          aria-controls="s-own-outbound" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Outbound — what your networks reach</span>
+<span class="count-badge">0 rules</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+  <div class="collapsible" data-body="own-outbound">
+  <p class="lede">Traffic your systems are permitted to send to other networks.</p>
+  <div class="empty">No rules in this category.</div>
+  </div>
+</section>
+
+
+  <section class="block" data-section="own-internal" id="s-own-internal">
+  <h2 class="section-head">
+  <button class="collapse" data-collapse="own-internal" aria-expanded="true"
+          aria-controls="s-own-internal" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Both ends yours — traffic that stays inside your own networks</span>
+<span class="count-badge">2 rules</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+  <div class="collapsible" data-body="own-internal">
+  <p class="lede">Source and destination are both networks you own, so no other team is involved.</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="num" title="Position of the rule inside its block">Pos</th>
+          <th>Rule</th>
+<th>Your networks</th><th>Other side</th>          <th>Service</th><th>Application</th>
+          <th>Ticket</th><th>Findings</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="scope-row" data-scope-header="DG-Production/pre">
+          <td colspan="9">
+            <span class="scope-step">1</span>
+            <span class="scope-title">DG-Production — pre-rules</span>
+            <span class="scope-reach">applies to 001901000001</span>
+            <span class="scope-count">2 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="0"
+    data-severity="info"
+    data-scope="DG-Production/pre"
+    data-direction="internal"
+    data-search="production-pre-06 chg0010035 project access, requested by c. placeholder, expires 27.08.2026 dg-production/pre  any untrust dmz grp-production-nested net-production 10.20.1.5/32 10.20.1.6/32 10.20.1.7/32 10.20.0.0/16 tcp/443 tcp/8080 tcp/8443 10.20.1.5/32 10.20.1.6/32 10.20.1.7/32 10.20.0.0/16 10.20.1.7/32 chg0010035 expires soon expiring_soon">
+  <td class="num pos" title="Position within DG-Production/pre">6</td>
+  <td class="name">
+    production-pre-06  </td>  <td class="objs"><span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.1.5/32, 10.20.1.6/32, 10.20.1.7/32">grp-production-nested</span>, <span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.0.0/16">net-production</span></td><td class="objs"><span class="named" title="3 entries
+10.20.1.5/32
+10.20.1.6/32
+10.20.1.7/32">grp-production-nested</span>, <span class="named" title="1 entry
+10.20.0.0/16">net-production</span>  </td>
+  <td class="svc">tcp/443, tcp/8080, tcp/8443</td>
+  <td>any</td>
+  <td><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010035" rel="noopener">CHG0010035</a></td>
+  <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span>   </td>
+  <td><button class="toggle" data-toggle="0" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="0" data-scope="DG-Production/pre">
+  <td colspan="9"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono"><strong>grp-production-nested</strong></dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">10.20.1.5/32, 10.20.1.6/32, <strong>10.20.1.7/32</strong></dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">net-production</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">10.20.0.0/16</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">untrust &rarr; dmz</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">tcp/443, tcp/8080, tcp/8443</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 6</dd>
+  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010035 project access, requested by C. Placeholder, expires 27.08.2026</dd>
+</div></dl>
+
+<dl class="detail-grid">
+<div><dt>Requested by</dt><dd>C. Placeholder</dd></div>  <div>
+    <dt>Expires</dt>
+    <dd>2026-08-27 <span class="pill">from “27.08.2026”</span>    </dd>
+  </div>
+</dl>
+
+
+<div style="margin-top:0.6rem">
+  <div class="finding-item info">
+    <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>Expires soon</strong>
+    <span class="pill mono">EXPIRING_SOON</span>
+    <div>The stated expiry is 2026-08-27, in 28 days.</div>
+<div class="rec">Suggested action: Confirm whether the access is still needed before it lapses.</div>  </div>
+</div>
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule names your network 10.20.1.7/32 (rpt-01 (reporting host, inside the payments network)).</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="1"
+    data-severity="info"
+    data-scope="DG-Production/pre"
+    data-direction="internal"
+    data-search="production-pre-17 jira-2016 application access, created 2025-06-15 dg-production/pre owner:platform any trust untrust grp-production-nested net-production 10.20.1.5/32 10.20.1.6/32 10.20.1.7/32 10.20.0.0/16 tcp/443 tcp/8080 tcp/8443 10.20.1.5/32 10.20.1.6/32 10.20.1.7/32 10.20.0.0/16 10.20.1.7/32  no change reference no_ticket">
+  <td class="num pos" title="Position within DG-Production/pre">17</td>
+  <td class="name">
+    production-pre-17  </td>  <td class="objs"><span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.1.5/32, 10.20.1.6/32, 10.20.1.7/32">grp-production-nested</span>, <span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.0.0/16">net-production</span></td><td class="objs"><span class="named" title="3 entries
+10.20.1.5/32
+10.20.1.6/32
+10.20.1.7/32">grp-production-nested</span>, <span class="named" title="1 entry
+10.20.0.0/16">net-production</span>  </td>
+  <td class="svc">tcp/443, tcp/8080, tcp/8443</td>
+  <td>any</td>
+  <td></td>
+  <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span>   </td>
+  <td><button class="toggle" data-toggle="1" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="1" data-scope="DG-Production/pre">
+  <td colspan="9"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono"><strong>grp-production-nested</strong></dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">10.20.1.5/32, 10.20.1.6/32, <strong>10.20.1.7/32</strong></dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">net-production</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">10.20.0.0/16</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">trust &rarr; untrust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">tcp/443, tcp/8080, tcp/8443</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 17</dd>
+<dt>Tags</dt><dd><span class="pill">owner:platform</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">JIRA-2016 application access, created 2025-06-15</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-06-15    </dd>
+  </div>
+</dl>
+
+
+<div style="margin-top:0.6rem">
+  <div class="finding-item info">
+    <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>No change reference</strong>
+    <span class="pill mono">NO_TICKET</span>
+    <div>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</div>
+<div class="rec">Suggested action: Add the ticket reference to the description.</div>  </div>
+</div>
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule names your network 10.20.1.7/32 (rpt-01 (reporting host, inside the payments network)).</div>
+</td>
+</tr>
+      </tbody>
+    </table>
+  </div>
+  </div>
+</section>
+
+
+
+  <h2 class="part">Rules that also cover your networks <span class="count-badge">14</span></h2>
+  <p class="part-lede">
+    Estate-wide rules maintained centrally. Nothing to decide — this is for information. Your
+    networks fall inside a much larger network these rules name, or the rule permits ‘any’. You
+    did not request them and cannot change them on your own, but they are access you have: no
+    need to apply for it, and if one of your systems must be excluded, say so.
+  </p>
+
+
+  <section class="block" data-section="covered-outbound" id="s-covered-outbound">
+  <h2 class="section-head">
+  <button class="collapse" data-collapse="covered-outbound" aria-expanded="true"
+          aria-controls="s-covered-outbound" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Outbound — what your networks may already reach</span>
+<span class="count-badge">4 rules</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+  <div class="collapsible" data-body="covered-outbound">
+  <p class="lede">Central rules that let your systems out: DNS, updates, monitoring and the like. No need to
+      request any of this.</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="num" title="Position of the rule inside its block">Pos</th>
+          <th>Rule</th>
+<th>Your networks</th><th>Other side</th>          <th>Service</th><th>Application</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="scope-row" data-scope-header="DG-Production/pre">
+          <td colspan="7">
+            <span class="scope-step">1</span>
+            <span class="scope-title">DG-Production — pre-rules</span>
+            <span class="scope-reach">applies to 001901000001</span>
+            <span class="scope-count">4 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="2"
+    data-severity="none"
+    data-scope="DG-Production/pre"
+    data-direction="outbound"
+    data-search="production-pre-03 chg0010014 standard access, requested by c. placeholder, created 14.12.2025 dg-production/pre  web-browsing dmz internal net-production  10.20.0.0/16  tcp/443 any 10.20.1.7/32 chg0010014  ">
+  <td class="num pos" title="Position within DG-Production/pre">3</td>
+  <td class="name">
+    production-pre-03  </td>  <td class="objs"><span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.0.0/16">net-production</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">tcp/443</td>
+  <td>web-browsing</td>
+  <td><button class="toggle" data-toggle="2" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="2" data-scope="DG-Production/pre">
+  <td colspan="7"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono"><strong>net-production</strong></dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono"><strong>10.20.0.0/16</strong></dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">tcp/443</dd>
+    <dt>Applications</dt>
+    <dd class="mono">web-browsing</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 3</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010014" rel="noopener">CHG0010014</a></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010014 standard access, requested by C. Placeholder, created 14.12.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+<div><dt>Requested by</dt><dd>C. Placeholder</dd></div>  <div>
+    <dt>Created</dt>
+    <dd>2025-12-14 <span class="pill">from “14.12.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="3"
+    data-severity="none"
+    data-scope="DG-Production/pre"
+    data-direction="outbound"
+    data-search="production-pre-08 chg0010049 temporary partner access, requested by b. sample, valid until 13.06.2026 dg-production/pre owner:platform temporary ssh internal trust net-production partner-range 10.20.0.0/16 198.51.100.10/31 198.51.100.12/30 198.51.100.16/30 198.51.100.20/32 tcp/22 198.51.100.10/31 198.51.100.12/30 198.51.100.16/30 198.51.100.20/32 10.20.1.7/32 chg0010049  ">
+  <td class="num pos" title="Position within DG-Production/pre">8</td>
+  <td class="name">
+    production-pre-08  </td>  <td class="objs"><span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.0.0/16">net-production</span></td><td class="objs"><span class="named" title="4 entries
+198.51.100.10/31
+198.51.100.12/30
+198.51.100.16/30
+198.51.100.20/32">partner-range</span>  </td>
+  <td class="svc">tcp/22</td>
+  <td>ssh</td>
+  <td><button class="toggle" data-toggle="3" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="3" data-scope="DG-Production/pre">
+  <td colspan="7"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono"><strong>net-production</strong></dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono"><strong>10.20.0.0/16</strong></dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">partner-range</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">198.51.100.10/31, 198.51.100.12/30, 198.51.100.16/30, 198.51.100.20/32</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">internal &rarr; trust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">tcp/22</dd>
+    <dt>Applications</dt>
+    <dd class="mono">ssh</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 8</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010049" rel="noopener">CHG0010049</a></dd><dt>Tags</dt><dd><span class="pill">owner:platform</span><span class="pill">temporary</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010049 temporary partner access, requested by B. Sample, valid until 13.06.2026</dd>
+</div></dl>
+
+<dl class="detail-grid">
+<div><dt>Requested by</dt><dd>B. Sample</dd></div>  <div>
+    <dt>Expires</dt>
+    <dd>2026-06-13 <span class="pill">from “13.06.2026”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="4"
+    data-severity="none"
+    data-scope="DG-Production/pre"
+    data-direction="outbound"
+    data-search="production-pre-14 chg0010091 standard access, requested by b. sample, created 24.07.2025 dg-production/pre owner:platform web-browsing untrust dmz net-production  10.20.0.0/16  tcp/443 any 10.20.1.7/32 chg0010091  ">
+  <td class="num pos" title="Position within DG-Production/pre">14</td>
+  <td class="name">
+    production-pre-14  </td>  <td class="objs"><span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.0.0/16">net-production</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">tcp/443</td>
+  <td>web-browsing</td>
+  <td><button class="toggle" data-toggle="4" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="4" data-scope="DG-Production/pre">
+  <td colspan="7"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono"><strong>net-production</strong></dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono"><strong>10.20.0.0/16</strong></dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">untrust &rarr; dmz</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">tcp/443</dd>
+    <dt>Applications</dt>
+    <dd class="mono">web-browsing</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 14</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010091" rel="noopener">CHG0010091</a></dd><dt>Tags</dt><dd><span class="pill">owner:platform</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010091 standard access, requested by B. Sample, created 24.07.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+<div><dt>Requested by</dt><dd>B. Sample</dd></div>  <div>
+    <dt>Created</dt>
+    <dd>2025-07-24 <span class="pill">from “24.07.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="5"
+    data-severity="none"
+    data-scope="DG-Production/pre"
+    data-direction="outbound"
+    data-search="production-pre-19 chg0010126 temporary partner access, requested by a. example, valid until 13.06.2026 dg-production/pre owner:payments temporary ssh dmz internal net-production partner-range 10.20.0.0/16 198.51.100.10/31 198.51.100.12/30 198.51.100.16/30 198.51.100.20/32 tcp/22 198.51.100.10/31 198.51.100.12/30 198.51.100.16/30 198.51.100.20/32 10.20.1.7/32 chg0010126  ">
+  <td class="num pos" title="Position within DG-Production/pre">19</td>
+  <td class="name">
+    production-pre-19  </td>  <td class="objs"><span class="named" title="Covers your 10.20.1.7/32
+Resolves to 10.20.0.0/16">net-production</span></td><td class="objs"><span class="named" title="4 entries
+198.51.100.10/31
+198.51.100.12/30
+198.51.100.16/30
+198.51.100.20/32">partner-range</span>  </td>
+  <td class="svc">tcp/22</td>
+  <td>ssh</td>
+  <td><button class="toggle" data-toggle="5" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="5" data-scope="DG-Production/pre">
+  <td colspan="7"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono"><strong>net-production</strong></dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono"><strong>10.20.0.0/16</strong></dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">partner-range</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">198.51.100.10/31, 198.51.100.12/30, 198.51.100.16/30, 198.51.100.20/32</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">tcp/22</dd>
+    <dt>Applications</dt>
+    <dd class="mono">ssh</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd>enabled</dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 19</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010126" rel="noopener">CHG0010126</a></dd><dt>Tags</dt><dd><span class="pill">owner:payments</span><span class="pill">temporary</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010126 temporary partner access, requested by A. Example, valid until 13.06.2026</dd>
+</div></dl>
+
+<dl class="detail-grid">
+<div><dt>Requested by</dt><dd>A. Example</dd></div>  <div>
+    <dt>Expires</dt>
+    <dd>2026-06-13 <span class="pill">from “13.06.2026”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> your network 10.20.1.7/32 lies inside 10.20.0.0/16, which is what the rule names.</div>
+</td>
+</tr>
+      </tbody>
+    </table>
+  </div>
+  </div>
+</section>
+
+
+  <section class="block" data-section="covered-other" id="s-covered-other">
+  <h2 class="section-head">
+  <button class="collapse" data-collapse="covered-other" aria-expanded="true"
+          aria-controls="s-covered-other" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Without a clear direction</span>
+<span class="count-badge">10 rules</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+  <div class="collapsible" data-body="covered-other">
+  <p class="lede">Rules permitting any source to any destination, so no side can be called yours or theirs.</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="num" title="Position of the rule inside its block">Pos</th>
+<th>Direction</th>          <th>Rule</th>
+<th>Your networks</th><th>Other side</th>          <th>Service</th><th>Application</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="scope-row" data-scope-header="DG-DMZ/pre">
+          <td colspan="8">
+            <span class="scope-step">1</span>
+            <span class="scope-title">DG-DMZ — pre-rules</span>
+            <span class="scope-reach">applies to 001901000003</span>
+            <span class="scope-count">2 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="6"
+    data-severity="none"
+    data-scope="DG-DMZ/pre"
+    data-direction="related"
+    data-search="dmz-pre-04 chg0010021 broad rule pending replacement, created 01.12.2025 dg-dmz/pre owner:payments any internal trust      any  chg0010021  ">
+  <td class="num pos" title="Position within DG-DMZ/pre">4</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    dmz-pre-04  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="6" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="6" data-scope="DG-DMZ/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">internal &rarr; trust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-DMZ/pre, position 4</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021" rel="noopener">CHG0010021</a></dd><dt>Tags</dt><dd><span class="pill">owner:payments</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010021 broad rule pending replacement, created 01.12.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-12-01 <span class="pill">from “01.12.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="7"
+    data-severity="none"
+    data-scope="DG-DMZ/pre"
+    data-direction="related"
+    data-search="dmz-pre-15 chg0010098 broad rule pending replacement, created 11.07.2025 dg-dmz/pre  any dmz internal      any  chg0010098  ">
+  <td class="num pos" title="Position within DG-DMZ/pre">15</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    dmz-pre-15  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="7" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="7" data-scope="DG-DMZ/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-DMZ/pre, position 15</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098" rel="noopener">CHG0010098</a></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010098 broad rule pending replacement, created 11.07.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-07-11 <span class="pill">from “11.07.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+        <tr class="scope-row" data-scope-header="DG-Production/pre">
+          <td colspan="8">
+            <span class="scope-step">2</span>
+            <span class="scope-title">DG-Production — pre-rules</span>
+            <span class="scope-reach">applies to 001901000001</span>
+            <span class="scope-count">2 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="8"
+    data-severity="none"
+    data-scope="DG-Production/pre"
+    data-direction="related"
+    data-search="production-pre-04 chg0010021 broad rule pending replacement, created 01.12.2025 dg-production/pre owner:payments any internal trust      any  chg0010021  ">
+  <td class="num pos" title="Position within DG-Production/pre">4</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    production-pre-04  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="8" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="8" data-scope="DG-Production/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">internal &rarr; trust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 4</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021" rel="noopener">CHG0010021</a></dd><dt>Tags</dt><dd><span class="pill">owner:payments</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010021 broad rule pending replacement, created 01.12.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-12-01 <span class="pill">from “01.12.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="9"
+    data-severity="none"
+    data-scope="DG-Production/pre"
+    data-direction="related"
+    data-search="production-pre-15 chg0010098 broad rule pending replacement, created 11.07.2025 dg-production/pre  any dmz internal      any  chg0010098  ">
+  <td class="num pos" title="Position within DG-Production/pre">15</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    production-pre-15  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="9" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="9" data-scope="DG-Production/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Production/pre, position 15</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098" rel="noopener">CHG0010098</a></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010098 broad rule pending replacement, created 11.07.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-07-11 <span class="pill">from “11.07.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+        <tr class="scope-row" data-scope-header="DG-Shared-Services/pre">
+          <td colspan="8">
+            <span class="scope-step">3</span>
+            <span class="scope-title">DG-Shared-Services — pre-rules</span>
+            <span class="scope-reach">applies to 001901000000, 001901000002, 001901000004</span>
+            <span class="scope-count">2 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="10"
+    data-severity="none"
+    data-scope="DG-Shared-Services/pre"
+    data-direction="related"
+    data-search="shared-services-pre-04 chg0010021 broad rule pending replacement, created 01.12.2025 dg-shared-services/pre owner:payments any internal trust      any  chg0010021  ">
+  <td class="num pos" title="Position within DG-Shared-Services/pre">4</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    shared-services-pre-04  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="10" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="10" data-scope="DG-Shared-Services/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">internal &rarr; trust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Shared-Services/pre, position 4</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021" rel="noopener">CHG0010021</a></dd><dt>Tags</dt><dd><span class="pill">owner:payments</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010021 broad rule pending replacement, created 01.12.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-12-01 <span class="pill">from “01.12.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="11"
+    data-severity="none"
+    data-scope="DG-Shared-Services/pre"
+    data-direction="related"
+    data-search="shared-services-pre-15 chg0010098 broad rule pending replacement, created 11.07.2025 dg-shared-services/pre  any dmz internal      any  chg0010098  ">
+  <td class="num pos" title="Position within DG-Shared-Services/pre">15</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    shared-services-pre-15  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="11" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="11" data-scope="DG-Shared-Services/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Shared-Services/pre, position 15</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098" rel="noopener">CHG0010098</a></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010098 broad rule pending replacement, created 11.07.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-07-11 <span class="pill">from “11.07.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+        <tr class="scope-row" data-scope-header="DG-Development/pre">
+          <td colspan="8">
+            <span class="scope-step">4</span>
+            <span class="scope-title">DG-Development — pre-rules</span>
+            <span class="scope-reach">applies to 001901000002</span>
+            <span class="scope-count">2 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="12"
+    data-severity="none"
+    data-scope="DG-Development/pre"
+    data-direction="related"
+    data-search="development-pre-04 chg0010021 broad rule pending replacement, created 01.12.2025 dg-development/pre owner:payments any internal trust      any  chg0010021  ">
+  <td class="num pos" title="Position within DG-Development/pre">4</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    development-pre-04  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="12" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="12" data-scope="DG-Development/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">internal &rarr; trust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Development/pre, position 4</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021" rel="noopener">CHG0010021</a></dd><dt>Tags</dt><dd><span class="pill">owner:payments</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010021 broad rule pending replacement, created 01.12.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-12-01 <span class="pill">from “01.12.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="13"
+    data-severity="none"
+    data-scope="DG-Development/pre"
+    data-direction="related"
+    data-search="development-pre-15 chg0010098 broad rule pending replacement, created 11.07.2025 dg-development/pre  any dmz internal      any  chg0010098  ">
+  <td class="num pos" title="Position within DG-Development/pre">15</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    development-pre-15  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="13" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="13" data-scope="DG-Development/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Development/pre, position 15</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098" rel="noopener">CHG0010098</a></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010098 broad rule pending replacement, created 11.07.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-07-11 <span class="pill">from “11.07.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+        <tr class="scope-row" data-scope-header="DG-Partner/pre">
+          <td colspan="8">
+            <span class="scope-step">5</span>
+            <span class="scope-title">DG-Partner — pre-rules</span>
+            <span class="scope-reach">applies to 001901000004</span>
+            <span class="scope-count">2 of 20 rules in this block concern you</span>
+          </td>
+        </tr>
+<tr class="rule-row"
+    data-index="14"
+    data-severity="none"
+    data-scope="DG-Partner/pre"
+    data-direction="related"
+    data-search="partner-pre-04 chg0010021 broad rule pending replacement, created 01.12.2025 dg-partner/pre owner:payments any internal trust      any  chg0010021  ">
+  <td class="num pos" title="Position within DG-Partner/pre">4</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    partner-pre-04  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="14" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="14" data-scope="DG-Partner/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">internal &rarr; trust</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Partner/pre, position 4</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010021" rel="noopener">CHG0010021</a></dd><dt>Tags</dt><dd><span class="pill">owner:payments</span></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010021 broad rule pending replacement, created 01.12.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-12-01 <span class="pill">from “01.12.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+<tr class="rule-row"
+    data-index="15"
+    data-severity="none"
+    data-scope="DG-Partner/pre"
+    data-direction="related"
+    data-search="partner-pre-15 chg0010098 broad rule pending replacement, created 11.07.2025 dg-partner/pre  any dmz internal      any  chg0010098  ">
+  <td class="num pos" title="Position within DG-Partner/pre">15</td>
+<td><span class="badge dir-related"><span class="icon" aria-hidden="true">•</span>No direction</span></td>  <td class="name">
+    partner-pre-15  </td>  <td class="objs"><span class="literal">—</span></td><td class="objs"><span class="literal">any</span>  </td>
+  <td class="svc">any</td>
+  <td>any</td>
+  <td><button class="toggle" data-toggle="15" aria-expanded="false">details</button></td>
+</tr>
+<tr class="detail-row hidden" data-detail="15" data-scope="DG-Partner/pre">
+  <td colspan="8"><dl class="detail-grid">
+  <div>
+    <dt>Source objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Source resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Destination objects</dt>
+    <dd class="mono">any</dd>
+    <dt>Destination resolves to</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Zones</dt>
+    <dd class="mono">dmz &rarr; internal</dd>
+    <dt>Service / ports</dt>
+    <dd class="mono">any</dd>
+    <dt>Applications</dt>
+    <dd class="mono">any</dd>
+  </div>
+  <div>
+    <dt>Action</dt>
+    <dd>allow</dd>
+    <dt>Logging</dt>
+    <dd><strong>not logged</strong></dd>
+    <dt>Where it sits</dt>
+    <dd>DG-Partner/pre, position 15</dd>
+<dt>Ticket</dt><dd><a class="ticket" href="https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number=CHG0010098" rel="noopener">CHG0010098</a></dd>  </div>
+</dl>
+
+<dl class="detail-grid"><div style="grid-column: 1 / -1">
+  <dt>Description as configured</dt><dd class="pre">CHG0010098 broad rule pending replacement, created 11.07.2025</dd>
+</div></dl>
+
+<dl class="detail-grid">
+  <div>
+    <dt>Created</dt>
+    <dd>2025-07-11 <span class="pill">from “11.07.2025”</span>    </dd>
+  </div>
+</dl>
+
+
+
+<div class="why">
+  <strong>Why this rule is in your report:</strong> the rule permits any source to any destination, so it covers this team&#39;s networks along with every other.</div>
+</td>
+</tr>
+      </tbody>
+    </table>
+  </div>
+  </div>
+</section>
+
+
+  <section class="block" id="s-findings">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="findings" aria-expanded="true"
+          aria-controls="s-findings" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Cleanup candidates</span>
+<span class="count-badge">2</span>  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="findings">
+      <p class="lede">
+        Findings on your own rules only. Rules that merely cover your networks are maintained by
+        the firewall team and are not listed here, because you could not act on them.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Severity</th><th>Finding</th><th>Rule</th><th>Location</th><th>Detail</th><th>Suggested action</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
+              <td class="name">production-pre-06</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The stated expiry is 2026-08-27, in 28 days.</td>
+              <td>Confirm whether the access is still needed before it lapses.</td>
+            </tr>
+            <tr>
+              <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
+              <td>No change reference<br><span class="pill mono">NO_TICKET</span></td>
+              <td class="name">production-pre-17</td>
+              <td><span class="pill mono">DG-Production/pre</span></td>
+              <td>The description holds no recognisable ticket number, so the rule cannot be traced back to an approved change.</td>
+              <td>Add the ticket reference to the description.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+
+  <footer class="report">
+    Generated by panorama-team-review 0.1.0 from
+    example-estate.xml    (sha256 36184e5eb65b9931…).
+    This report reflects the configuration as backed up; changes made afterwards are not included.
+    <a href="#top">Back to top ↑</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // --- sticky header ------------------------------------------------------
+  // The table header rows stick directly below the page header, so they need
+  // its current height. Measured rather than hard-coded: it depends on the team
+  // name, the contact and how many sections the jump bar lists -- and it
+  // changes when the header shrinks on scroll.
+  var header = document.getElementById("page-header");
+  function measure() {
+    if (!header) return;
+    document.documentElement.style.setProperty("--header-h", header.offsetHeight + "px");
+  }
+  // Two thresholds, not one. With a single boundary the header shrinks, the
+  // page gets shorter, the scroll position falls back below the boundary, and
+  // it expands again -- a flicker that is worst exactly where a reader tends to
+  // stop. Requiring a clear move in each direction removes it.
+  var COMPACT_FROM = 160;
+  var EXPAND_BELOW = 60;
+
+  if (header) {
+    window.addEventListener("scroll", function () {
+      var compact = header.classList.contains("compact");
+      if (!compact && window.scrollY > COMPACT_FROM) header.classList.add("compact");
+      else if (compact && window.scrollY < EXPAND_BELOW) header.classList.remove("compact");
+    }, { passive: true });
+
+    if (window.ResizeObserver) {
+      // The header shrinks through a CSS transition, so its height is not yet
+      // final at the moment the class changes. Measuring only then left the
+      // column headers floating a transition's worth of pixels too low, with
+      // table rows sliding through the gap. Observing the element instead
+      // keeps the offset correct for every frame of the animation.
+      new ResizeObserver(measure).observe(header);
+    } else {
+      window.addEventListener("resize", measure);
+      header.addEventListener("transitionend", measure);
+    }
+    measure();
+  }
+
+  // --- collapsible sections ----------------------------------------------
+  function setCollapsed(button, collapsed) {
+    var id = button.getAttribute("data-collapse");
+    var body = document.querySelector('.collapsible[data-body="' + id + '"]');
+    if (!body) return;
+    body.classList.toggle("hidden", collapsed);
+    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var head = button.closest(".section-head");
+    if (head) head.classList.toggle("collapsed", collapsed);
+  }
+
+  document.querySelectorAll("button.collapse").forEach(function (button) {
+    button.addEventListener("click", function () {
+      setCollapsed(button, button.getAttribute("aria-expanded") === "true");
+    });
+  });
+
+  var collapseAll = document.getElementById("collapse-all");
+  if (collapseAll) {
+    collapseAll.addEventListener("click", function () {
+      var buttons = Array.prototype.slice.call(document.querySelectorAll("button.collapse"));
+      var anyOpen = buttons.some(function (b) {
+        return b.getAttribute("aria-expanded") === "true";
+      });
+      buttons.forEach(function (b) { setCollapsed(b, anyOpen); });
+      collapseAll.textContent = anyOpen ? "⊞ Expand all" : "⊟ Collapse all";
+    });
+  }
+
+  // Any link into a collapsed section -- the jump bar or a summary tile --
+  // would otherwise scroll to a heading with nothing under it, which reads as
+  // a broken link.
+  document.querySelectorAll('a[href^="#s-"]').forEach(function (link) {
+    link.addEventListener("click", function () {
+      var section = document.querySelector(link.getAttribute("href"));
+      if (!section) return;
+      var button = section.querySelector("button.collapse");
+      if (button && button.getAttribute("aria-expanded") === "false") setCollapsed(button, false);
+    });
+  });
+
+  // --- filtering ----------------------------------------------------------
+  var input = document.getElementById("filter");
+  if (!input) return;
+
+  var rows = Array.prototype.slice.call(document.querySelectorAll("tr.rule-row"));
+  var details = {};
+  document.querySelectorAll("tr.detail-row").forEach(function (row) {
+    details[row.getAttribute("data-detail")] = row;
+  });
+  var counter = document.getElementById("count");
+  var severities = new Set();
+
+  function apply() {
+    var needle = input.value.trim().toLowerCase();
+    var visible = 0;
+    rows.forEach(function (row) {
+      var haystack = row.getAttribute("data-search") || "";
+      var matchesText = !needle || haystack.indexOf(needle) !== -1;
+      var matchesSeverity = severities.size === 0 || severities.has(row.getAttribute("data-severity"));
+      var show = matchesText && matchesSeverity;
+      row.classList.toggle("hidden", !show);
+      if (show) visible++;
+      var detail = details[row.getAttribute("data-index")];
+      if (detail && !show) {
+        detail.classList.add("hidden");
+        var button = row.querySelector(".toggle");
+        if (button) button.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    // A block heading with nothing left under it is worse than no heading: it
+    // reads as "your rules in this block were filtered to zero" only if you
+    // notice the emptiness, and as a rendering bug otherwise.
+    document.querySelectorAll("tr.scope-row").forEach(function (head) {
+      var section = head.closest("section");
+      var scope = head.getAttribute("data-scope-header");
+      var any = section.querySelectorAll(
+        'tr.rule-row[data-scope="' + (window.CSS && CSS.escape ? CSS.escape(scope) : scope) + '"]:not(.hidden)'
+      ).length;
+      head.classList.toggle("hidden", any === 0);
+    });
+
+    counter.textContent = visible + " of " + rows.length + " rules shown";
+    document.querySelectorAll("section.block[data-section]").forEach(function (section) {
+      var any = section.querySelectorAll("tr.rule-row:not(.hidden)").length;
+      section.classList.toggle("hidden", needle !== "" || severities.size > 0 ? any === 0 : false);
+    });
+  }
+
+  input.addEventListener("input", apply);
+
+  document.querySelectorAll(".controls button[data-severity]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var value = button.getAttribute("data-severity");
+      if (severities.has(value)) { severities.delete(value); button.setAttribute("aria-pressed", "false"); }
+      else { severities.add(value); button.setAttribute("aria-pressed", "true"); }
+      apply();
+    });
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    input.value = "";
+    severities.clear();
+    document.querySelectorAll(".controls button[data-severity]").forEach(function (b) {
+      b.setAttribute("aria-pressed", "false");
+    });
+    apply();
+  });
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("button.toggle");
+    if (!button) return;
+    var detail = details[button.getAttribute("data-toggle")];
+    if (!detail) return;
+    var open = detail.classList.toggle("hidden");
+    button.setAttribute("aria-expanded", open ? "false" : "true");
+    button.textContent = open ? "details" : "hide";
+  });
+
+  var theme = document.getElementById("theme");
+  if (theme) {
+    theme.addEventListener("click", function () {
+      var root = document.documentElement;
+      var current = root.getAttribute("data-theme");
+      if (!current) {
+        current = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      root.setAttribute("data-theme", current === "dark" ? "light" : "dark");
+    });
+  }
+
+  apply();
+})();
+</script>
+</body>
+</html>

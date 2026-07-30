@@ -1,0 +1,19 @@
+{
+  "//": "Markdown lint rules. The documentation uses compact table separators (|---|) and wraps prose at ~80 columns; these settings stop editors flagging that as an error.",
+
+  "MD013": false,
+  "MD033": false,
+  "MD041": false,
+
+  "MD060": {
+    "style": "leading_and_trailing"
+  },
+
+  "MD024": {
+    "siblings_only": true
+  },
+
+  "MD029": {
+    "style": "ordered"
+  }
+}

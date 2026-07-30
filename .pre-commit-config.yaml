@@ -1,0 +1,48 @@
+# Pre-commit hooks.
+#
+# The customer-data guard is the important one and it runs first: this project
+# must never contain configuration traceable to a real estate, and that
+# guarantee cannot depend on everyone remembering it.
+#
+# Install with:
+#   pip install pre-commit && pre-commit install
+
+repos:
+  - repo: local
+    hooks:
+      - id: no-customer-data
+        name: Block customer data
+        description: >-
+          Scan staged files for routable addresses, real hostnames, device
+          serials and secrets. See docs/PRIVACY.md.
+        entry: python tools/check_no_customer_data.py
+        language: system
+        pass_filenames: true
+        always_run: false
+        exclude: '^(LICENSE|uv\.lock|docs/PRIVACY\.md|tools/check_no_customer_data\.py)$'
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.7
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+        # Formatting is checked, not enforced: the codebase uses deliberate
+        # alignment in table-like literals that the formatter would collapse.
+        stages: [manual]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+        exclude: '^config/.*\.example\.yaml$'
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: mixed-line-ending
+        args: [--fix=lf]

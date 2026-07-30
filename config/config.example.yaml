@@ -1,0 +1,323 @@
+# panorama-team-review -- example configuration
+#
+# Every setting below has a working default; a minimal configuration is just
+# `input.backup_dir` and `teams_file`. Everything else is here so you can see
+# what is adjustable without reading the source.
+#
+# Paths are resolved relative to this file, so a config directory can be moved
+# or mounted elsewhere without editing it.
+#
+# Validate your changes with:  pan-review -c config.yaml validate
+
+
+# ---------------------------------------------------------------------------
+# Where backups come from
+# ---------------------------------------------------------------------------
+input:
+  # Directory the firewall or Panorama writes its scheduled backups into.
+  # `pan-review run` with no arguments takes the newest file matching a pattern.
+  backup_dir: /var/backups/panorama
+
+  patterns:
+    - "*.xml"
+    - "*.xml.gz"
+    - "*.tgz"          # Panorama scheduled backups often ship as a tar archive
+    - "*.tar.gz"       # containing one XML per managed device
+
+  # Search subdirectories. Needed when backups rotate through directories,
+  # e.g. a scheduled job writing alternately into A/ and B/.
+  recursive: false
+
+  # latest = only the newest backup (the cron case)
+  # all    = every matching file, each producing its own set of reports
+  select: latest
+
+  # How "newest" is decided:
+  #   mtime    - the file timestamp (default)
+  #   filename - a date read out of the file name
+  #
+  # Prefer `filename` whenever backups are copied, rsync-ed or extracted on
+  # their way to this host. Those operations rewrite mtimes, so a two-week-old
+  # configuration can carry today's timestamp and the tool would report on
+  # stale policy while looking perfectly healthy.
+  select_by: mtime
+  filename_date_pattern: '(?P<date>\d{4}-?\d{2}-?\d{2})'
+  filename_date_formats: ["%Y%m%d", "%Y-%m-%d"]
+
+  # Refuse to run if the newest backup is older than this many days. Catches a
+  # silently broken backup job before it feeds stale data into a review cycle.
+  # Leave unset to disable the check.
+  max_age_days: 7
+
+
+# ---------------------------------------------------------------------------
+# Where reports go
+# ---------------------------------------------------------------------------
+output:
+  directory: ./reports
+
+  # html  -- self-contained, searchable, clickable ticket links. What owners use.
+  # xlsx  -- the working format: owners fill in Decision and Comment and send it back.
+  # pdf   -- the audit artefact, frozen per date. Requires the [pdf] extra.
+  # json  -- complete machine-readable record; input to `pan-review diff`.
+  formats: [html, xlsx, pdf, json]
+
+  per_team: true       # one file per team
+  combined: true       # plus one overview across all teams
+
+  # Available placeholders: {date}, {team_id}, {team_name}
+  filename_template: "{date}_{team_id}_firewall-review"
+  # The overview lands beside one report per team, all sharing the date
+  # prefix. The leading "00" keeps it at the top of the listing instead of
+  # somewhere in the middle of a hundred files.
+  combined_filename_template: "{date}_00_OVERVIEW_all-teams"
+
+  # Write into reports/<YYYY-MM-DD>/ so nightly runs do not overwrite each other.
+  timestamped_subdir: true
+
+  # Delete all but the N newest run directories. Unset keeps everything.
+  keep_runs: 12
+
+
+# ---------------------------------------------------------------------------
+# Who owns what
+# ---------------------------------------------------------------------------
+
+# The team and asset inventory. See inventory.example.yaml.
+teams_file: inventory.yaml
+
+ownership:
+  # Resolvers are applied in this order.
+  #
+  #   inventory     -- compares rule addresses against team assets. The only
+  #                    resolver that knows *which side* matched, so it is the
+  #                    only source of inbound/outbound direction. Always runs.
+  #   tag           -- a rule tagged 'owner:payments' belongs to team 'payments'
+  #   regex         -- rule name or description matches a pattern
+  #   device_group  -- the rule lives in a device group assigned to a team
+  #   zone          -- a from/to zone belongs to a team (this one carries direction)
+  order: [inventory, tag, regex, device_group, zone]
+
+  # With this set, the first of the non-inventory resolvers to match wins, so a
+  # broad device-group assignment does not drown out a precise tag.
+  stop_after_first_match: true
+
+  # A tag 'owner:payments' assigns the rule to the team with id 'payments'.
+  tag_prefixes: ["owner:", "team:"]
+  tag_case_sensitive: false
+
+  # Global patterns applied to every rule name. Must capture a group named
+  # 'team' whose value is a team id from the inventory.
+  # Per-team patterns can also be set in the inventory itself.
+  name_patterns: []
+  # Example:
+  #   - '^(?P<team>PAY|PLT|DEV)-'
+  description_patterns: []
+
+  # overlap   -- any intersection between a rule network and a team asset counts
+  # contained -- the rule network must lie entirely inside the asset
+  match_mode: overlap
+
+  # Every report separates the rules written FOR a team from the estate-wide
+  # ones that merely include them -- ping, DNS, Active Directory. Only the
+  # first kind carries findings and asks for a decision.
+  #
+  # A rule is the team's own when one of its networks lies inside one of
+  # theirs. This says how much larger a rule's network may be and still count
+  # as theirs. 1 (the default) means any strictly larger network counts as
+  # merely covering them: a rule naming 10.0.0.0/8 is not your rule because
+  # your /24 happens to sit inside it.
+  #
+  # Raise it if your inventory lists individual hosts rather than networks --
+  # 9 keeps a rule naming the /24 a /32 asset lives in counted as that team's.
+  covering_supernet_bits: 1
+
+  # Rules with 'any' on BOTH sides affect everyone. Showing them to every team
+  # is honest but noisy, so they are capped per team. They are always reported
+  # as covering a team, never as its own.
+  include_any_rules: true
+  max_any_rules_per_team: 50
+
+
+# ---------------------------------------------------------------------------
+# Reading tickets and dates out of rule descriptions
+# ---------------------------------------------------------------------------
+#
+# The description field is where a rule's change history actually lives. These
+# patterns turn it into clickable links and expiry warnings.
+#
+# Each ticket pattern needs a named group `(?P<id>...)`. The url_template is
+# formatted with the regex's named groups.
+metadata:
+  ticket_patterns:
+    - name: jira
+      regex: '\b(?P<id>[A-Z][A-Z0-9]{1,9}-\d{1,6})\b'
+      url_template: "https://jira.example.com/browse/{id}"
+      fields: [description, tag]
+
+    - name: servicenow
+      regex: '\b(?P<id>(?:CHG|INC|RITM|REQ)\d{7,})\b'
+      url_template: "https://example.service-now.com/nav_to.do?uri=task.do?sysparm_query=number={id}"
+      fields: [description, tag]
+
+    # A pattern without a url_template still extracts the reference; it just
+    # renders as plain text instead of a link.
+    - name: legacy-ticket
+      regex: '\bTICKET[ #:-]?(?P<id>\d{4,8})\b'
+      fields: [description]
+
+  # What a date MEANS is decided by the words shortly before it, and those
+  # words do not change with the date format. So the keyword list lives here
+  # once and applies to every pattern below -- add your own language here.
+  #
+  #   "valid until 2026-12-31"  -> expiry
+  #   "gultig bis 31.12.2026"   -> expiry
+  #   "created 2024-03-01"      -> creation date
+  role_keywords:
+    expires: [until, expires, expiry, "valid until", "temp until", "remove after",
+              bis, "gueltig bis", "befristet bis"]
+    created: [created, added, requested, opened, erstellt, beantragt, angelegt]
+    reviewed: [reviewed, checked, confirmed, recertified, geprueft, bestaetigt]
+
+  # Date formats to recognise. All of them use the shared role_keywords above;
+  # a pattern may set its own `role_keywords:` to override that, which is
+  # rarely what you want.
+  date_patterns:
+    - name: iso                                  # 2026-12-31
+      regex: '\b\d{4}-\d{2}-\d{2}\b'
+      date_format: "%Y-%m-%d"
+
+    - name: dot-dmy                              # 31.12.2026
+      regex: '\b\d{1,2}\.\d{1,2}\.\d{4}\b'
+      date_format: "%d.%m.%Y"
+
+    # Characters before the date that are searched for a keyword.
+    # Applies per pattern; 40 is a sensible default.
+    #  keyword_window: 40
+
+  # Some estates record edits positionally, with no keyword to read:
+  #   "CHG0041234 (a.beck: 2024-05-30)"   ticket, admin, date
+  #   "CHG0041299 a.beck 2027-07-18"
+  # Nothing is recognised by default, because a pattern loose enough to catch a
+  # bare username also matches the word before any date. Spell out your own
+  # convention and the date becomes a change date rather than one of unstated
+  # purpose -- which is also what lets a mistyped year be reported.
+  #
+  # Needs a named group 'date'; an optional 'requester' names the person. These
+  # run only on dates the keywords above could not explain, so an expiry stays
+  # an expiry.
+  change_patterns: []
+  # Example:
+  #   - '\((?P<requester>[A-Za-z][\w.-]{1,29})\s*[:,]?\s*(?P<date>\d{4}-\d{2}-\d{2})\)'
+  #   - '\b(?P<requester>[A-Za-z][A-Za-z0-9._-]{1,19})\s+(?P<date>\d{4}-\d{2}-\d{2})\b'
+
+  requester_patterns:
+    - '(?:requested by|owner|contact)[:\s]+(?P<requester>[\w.\- ]{3,40})'
+
+
+# ---------------------------------------------------------------------------
+# Cleanup checks
+# ---------------------------------------------------------------------------
+#
+# Run `pan-review checks` for the full list with descriptions.
+analysis:
+  enabled_checks:
+    - ANY_ANY             # source and destination both 'any'
+    - ANY_DESTINATION
+    - ANY_SOURCE
+    - ANY_SERVICE         # no service and no App-ID restriction
+    - BROAD_NETWORK
+    - DISABLED_RULE
+    - EXPIRED_RULE        # past the expiry stated in its own description
+    - EXPIRING_SOON
+    - NO_DESCRIPTION
+    - NO_TICKET
+    - NO_LOGGING
+    - UNUSED_RULE         # needs hit counts; silent without them
+    - STALE_RULE          # needs hit counts
+    - UNRESOLVED_OBJECT
+    - EMPTY_GROUP
+
+  # An IPv4 network shorter than this prefix counts as overly broad.
+  # A rule to the internet has 'any' as its destination because the internet is
+  # its destination -- there is no tighter way to write it, so ANY_DESTINATION
+  # stays silent when every destination zone of a rule is listed here. What such
+  # a rule may carry is still flagged by ANY_SERVICE.
+  internet_zones: [outside, untrust, internet, wan]
+
+  broad_network_prefix_v4: 16
+  broad_network_prefix_v6: 48
+
+  expiring_soon_days: 60
+  stale_rule_days: 180
+
+  require_ticket: true
+
+  # Rules carrying any of these tags are exempt from all findings.
+  ignore_tags: []
+  # Rule names matching these regexes are exempt.
+  ignore_rule_patterns: []
+
+
+# ---------------------------------------------------------------------------
+# Hit counts -- OPTIONAL, and the only feature that touches the network
+# ---------------------------------------------------------------------------
+#
+# Rule hit counters are runtime state and are NEVER contained in a
+# configuration backup. Answering "is this rule still used?" therefore requires
+# querying the device. This is disabled by default and issues read-only
+# operational commands only.
+#
+# Recommended setup: schedule `pan-review collect-hitcounts` once a night to
+# refresh the cache, and keep `pan-review run` fully offline by passing
+# --no-network.
+hitcounts:
+  enabled: false
+
+  # An empty list is fine; the module does nothing until devices are listed.
+  devices: []
+    # - panorama.example.com
+    # - fw-edge-01.example.com
+
+  # The API key is read from this environment variable. Keys are never read
+  # from this file, so the configuration stays shareable.
+  api_key_env: PAN_API_KEY
+  # Alternatively, a file containing only the key:
+  # api_key_file: /etc/panorama-team-review/api.key
+
+  verify_tls: true
+  # ca_bundle: /etc/ssl/certs/internal-ca.pem
+  timeout_seconds: 30
+
+  rulebases: [security]
+
+  # Collected counters are cached here so offline runs can reuse them.
+  cache_dir: ./cache
+  cache_max_age_hours: 24
+
+
+# ---------------------------------------------------------------------------
+# Report presentation
+# ---------------------------------------------------------------------------
+report:
+  title: "Firewall Rule Review"
+  organisation: "Example Organisation"
+  language: en
+
+  # Shown in the 'how to request a change' section of every report.
+  contact_text: >-
+    Questions about a rule, or need one changed? Contact the network security
+    team at netsec@example.com and quote the rule name and location.
+  change_request_url: "https://example.service-now.com/sp?id=sc_cat_item&sys_id=firewall-change"
+
+  include_disabled_rules: true
+  include_nat_rules: true
+  include_rule_uuid: false
+
+  # Truncate long resolved address lists in rendered output (the JSON keeps all).
+  max_addresses_shown: 25
+
+  show_unassigned_section: true
+
+  # order | name | severity
+  sort_rules_by: order

@@ -1,0 +1,93 @@
+# panorama-team-review -- example team and asset inventory
+#
+# This file answers the one question a firewall configuration cannot: which
+# network belongs to which team. It is kept separate from config.yaml so it can
+# be generated from a CMDB and held under different access control.
+#
+# Addresses below use documentation ranges (RFC 5737) and private space; replace
+# them with your own.
+#
+# Only `id` is required. A team with no assets, tags, device groups, zones or
+# name patterns can never have a rule attributed to it -- `pan-review validate`
+# warns about that.
+
+teams:
+
+  # ---------------------------------------------------------------------
+  # The common case: a team identified by the networks it owns.
+  # ---------------------------------------------------------------------
+  - id: payments
+    name: Payments Platform
+    contact: payments-team@example.com
+    description: Card processing and settlement services
+
+    assets:
+      # Long form, with a label shown in the report so owners recognise the box.
+      - cidr: 10.20.10.0/24
+        label: Payments production
+      - cidr: 10.20.11.0/24
+        label: Payments staging
+      - cidr: 10.20.12.5/32
+        label: payment-gw01 (settlement gateway)
+      # Short form, when a label adds nothing.
+      - 2001:db8:20::/64
+
+  # ---------------------------------------------------------------------
+  # A team also identified by rule tags and by its device group -- useful
+  # while the network inventory is still incomplete.
+  # ---------------------------------------------------------------------
+  - id: platform
+    name: Platform Services
+    contact: platform@example.com
+    description: Shared infrastructure -- DNS, NTP, monitoring, identity
+
+    assets:
+      - cidr: 10.10.0.0/16
+        label: Management network
+      - cidr: 10.10.1.10/32
+        label: dns01
+      - cidr: 10.10.1.11/32
+        label: dns02
+
+    # Any rule carrying one of these tags is attributed to this team,
+    # in addition to whatever the asset match finds.
+    tags:
+      - owner:platform
+      - infra
+
+    # Every rule defined in these device groups belongs to this team.
+    device_groups:
+      - DG-Shared-Services
+
+    # Zones carry direction: a rule with from-zone 'zone-platform' is
+    # outbound for this team, to-zone means inbound.
+    zones:
+      - zone-platform
+
+  # ---------------------------------------------------------------------
+  # A team identified purely by naming convention -- the fallback for
+  # estates with a disciplined rule-naming scheme and no address inventory.
+  # ---------------------------------------------------------------------
+  - id: webshop
+    name: Webshop
+    contact: webshop-dev@example.com
+
+    assets:
+      - cidr: 10.30.0.0/16
+        label: Webshop application tier
+
+    # Regexes applied to rule names. Unlike the global patterns in
+    # config.yaml, these need no 'team' capture group -- matching is enough.
+    name_patterns:
+      - '^WEB-'
+      - '(?i)webshop'
+
+  # ---------------------------------------------------------------------
+  # A minimal entry. Perfectly valid.
+  # ---------------------------------------------------------------------
+  - id: partner-integration
+    name: Partner Integration
+    contact: partners@example.com
+    assets:
+      - cidr: 198.51.100.0/24
+        label: Partner uplink range

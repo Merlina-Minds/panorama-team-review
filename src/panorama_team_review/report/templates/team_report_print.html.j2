@@ -1,0 +1,299 @@
+{# Print layout for the PDF renderer. No scripts, fewer columns, explicit page
+   breaks. The audit artefact: what the policy looked like on this date.
+
+   Unlike the interactive report this keeps the full provenance -- every
+   configuration document, the PAN-OS version, the checksum -- on the cover
+   page. That is what the format is for: nobody reads it to decide about a
+   rule, they read it to establish what was true on a date. #}
+<!doctype html>
+<html lang="{{ config.report.language }}">
+<head>
+<meta charset="utf-8">
+<title>{{ config.report.title }} — {{ report.team.name }}</title>
+<style>{{ css }}</style>
+</head>
+<body>
+
+{% set own_inbound = report.own("inbound") %}
+{% set own_outbound = report.own("outbound") %}
+{% set own_internal = report.own("internal") %}
+{% set own_related = report.own("related") %}
+{% set covered = report.covered_views %}
+{% set cov_inbound = report.covered("inbound") %}
+{% set cov_outbound = report.covered("outbound") %}
+{% set cov_other = report.covered("internal") + report.covered("related") %}
+
+<div class="cover">
+  <h1>{{ config.report.title }}</h1>
+  <div class="subject">{{ report.team.name }}</div>
+  <div class="provenance-line">
+    {{ bundle.meta.backup_label }} · generated {{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-cell"><div class="value">{{ report.team.assets | length }}</div><div class="label">Your networks</div></div>
+    <div class="summary-cell"><div class="value">{{ own_inbound | length }}</div><div class="label">Inbound</div></div>
+    <div class="summary-cell"><div class="value">{{ own_outbound | length }}</div><div class="label">Outbound</div></div>
+    <div class="summary-cell"><div class="value">{{ covered | length }}</div><div class="label">Also cover you</div></div>
+    <div class="summary-cell"><div class="value">{{ report.findings | length }}</div><div class="label">Cleanup candidates</div></div>
+  </div>
+
+  <div class="cover-meta">
+    <table>
+      <tr><td class="key">Team</td><td>{{ report.team.name }} ({{ report.team.id }})</td></tr>
+      {% if report.team.contact %}<tr><td class="key">Contact</td><td>{{ report.team.contact }}</td></tr>{% endif %}
+      <tr><td class="key">Configuration source</td><td>{{ bundle.meta.backup_label }}{% if bundle.meta.document_count > 1 %} ({{ bundle.meta.document_count }} configuration documents){% endif %}</td></tr>
+      <tr><td class="key">Configuration type</td><td>{{ bundle.meta.source_type }}{% if bundle.meta.pan_os_version %}, PAN-OS {{ bundle.meta.pan_os_version }}{% endif %}</td></tr>
+      {% if bundle.meta.file_mtime %}<tr><td class="key">Backup timestamp</td><td>{{ bundle.meta.file_mtime.strftime("%Y-%m-%d %H:%M") }}</td></tr>{% endif %}
+      <tr><td class="key">Report generated</td><td>{{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}</td></tr>
+      {% if bundle.meta.config_hash %}<tr><td class="key">Configuration checksum</td><td class="mono">sha256:{{ bundle.meta.config_hash[:32] }}…</td></tr>{% endif %}
+      <tr><td class="key">Tool</td><td>panorama-team-review {{ bundle.meta.tool_version }}</td></tr>
+    </table>
+  </div>
+
+  <div class="explainer">
+    <strong>How to read this report</strong>
+    <p style="margin:1mm 0">This report contains two kinds of rule, and only the first is a question to you.</p>
+    <ul>
+      <li><strong>Your rules</strong> — written for your address space: the rule names one of your
+        networks, or carries your team's tag or zone. You are the one who can say whether they are
+        still needed.
+        <ul>
+          <li><strong>Inbound</strong> — other systems may reach yours. These are your exposure.</li>
+          <li><strong>Outbound</strong> — your systems may reach elsewhere.</li>
+          <li><strong>Both ends yours</strong> — source and destination are both networks of yours.</li>
+          <li><strong>No direction</strong> — attributed by tag, name or device group, which does not say which side you are on.</li>
+        </ul>
+      </li>
+      <li><strong>Rules that also cover your networks</strong> — estate-wide rules that happen to
+        include you: ping, DNS, Active Directory. Nothing is being asked of you here; they are
+        listed so you can see the access you already have, and object if one of your systems must
+        not have it.</li>
+    </ul>
+    <p style="margin:2mm 0 0">
+      Rules appear in the order the firewall evaluates them, grouped into the blocks it evaluates
+      as a unit; the first matching rule wins. Addresses are the result of resolving address
+      objects and groups. Object names are given so they can be cited in a change request.
+      {% if config.report.contact_text %}{{ config.report.contact_text }}{% endif %}
+    </p>
+  </div>
+
+  {% if not bundle.hitcount_available %}
+  <div class="note">
+    <strong>Usage data not included.</strong>
+    Rule hit counters are runtime state and are not contained in a configuration backup. This
+    report therefore makes no statement about whether a rule is used. Hit counts can be collected
+    separately via the optional enrichment module.
+  </div>
+  {% endif %}
+
+  {% if config.report.change_request_url %}
+  <div class="note" style="border-left-color:#1f3864;background:#eef2f9">
+    <strong>Requesting a change:</strong> {{ config.report.change_request_url }}
+  </div>
+  {% endif %}
+</div>
+
+{% if report.team.assets %}
+<section class="first">
+  <h2>Your networks ({{ report.team.assets | length }})</h2>
+  <p class="lede">
+    What this report considers yours, and how many of your own rules touch each. Everything else
+    follows from this list, so a wrong entry makes the rest wrong in the same way.
+  </p>
+  <table>
+    <colgroup><col style="width:22%"><col style="width:56%"><col style="width:11%"><col style="width:11%"></colgroup>
+    <thead><tr><th>Network</th><th>System</th><th>Inbound rules</th><th>Outbound rules</th></tr></thead>
+    <tbody>
+      {% for cidr in report.team.assets %}
+      <tr>
+        <td class="mono">{{ cidr }}</td>
+        <td>{{ report.team.asset_labels.get(cidr, "—") }}</td>
+        <td>{{ asset_counts.inbound.get(cidr, 0) }}</td>
+        <td>{{ asset_counts.outbound.get(cidr, 0) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if report.objects %}
+<section>
+  <h2>Objects and groups inside your networks ({{ report.objects | length }})</h2>
+  <p class="lede">
+    What your networks are called in the firewall. Every address object and group whose addresses
+    lie entirely within your networks — these are the names to quote when you ask for a rule to be
+    changed, and the names you will see in the rules below.
+  </p>
+  <table>
+    <colgroup><col style="width:26%"><col style="width:8%"><col style="width:14%"><col style="width:26%"><col style="width:26%"></colgroup>
+    <thead><tr><th>Name</th><th>Kind</th><th>Defined in</th><th>Covers</th><th>Description</th></tr></thead>
+    <tbody>
+      {% for obj in report.objects %}
+      <tr>
+        <td class="mono">{{ obj.name }}</td>
+        <td>{{ obj.kind }}</td>
+        <td class="mono">{{ obj.scope }}</td>
+        <td class="mono">{{ obj.networks[:6] | join(", ") }}{% if obj.networks | length > 6 %}, … (+{{ obj.networks | length - 6 }} more){% endif %}</td>
+        <td>{{ obj.description }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% macro rule_table(groups, title, lede, count, show_findings=true, show_direction=false) %}
+<section>
+  <h2>{{ title }} ({{ count }})</h2>
+  <p class="lede">{{ lede }}</p>
+  {% if groups %}
+  <table>
+    {# One width set per column layout, each adding up to exactly 100. A
+       colgroup that overflows is not clipped by the renderer -- the last
+       column is pushed off the printable area instead, which is how the
+       Findings column ended up half in the margin. #}
+    {%- if show_findings %}{% set widths = [4, 18, 14, 22, 13, 9, 8, 12] %}
+    {%- elif show_direction %}{% set widths = [4, 9, 19, 16, 26, 16, 10] %}
+    {%- else %}{% set widths = [4, 21, 18, 28, 18, 11] %}{% endif %}
+    <colgroup>{% for width in widths %}<col style="width:{{ width }}%">{% endfor %}</colgroup>
+    <thead>
+      <tr>
+        <th>Pos</th>
+        {% if show_direction %}<th>Direction</th>{% endif %}
+        <th>Rule</th><th>Your networks</th><th>Other side</th>
+        <th>Service / ports</th><th>Application</th>
+        {% if show_findings %}<th>Ticket</th><th>Findings</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for scope, views in groups %}
+      <tr class="scope-row">
+        <td colspan="{{ 6 + (1 if show_direction else 0) + (2 if show_findings else 0) }}">
+          <strong>{{ loop.index }}. {{ scope.title }}</strong> —
+          applies to {{ scope.applies_to }};
+          {{ views | length }} of {{ scope.rule_count }} rule{{ "" if scope.rule_count == 1 else "s" }} in this block concern you
+        </td>
+      </tr>
+      {% for view in views %}
+      <tr class="{{ 'disabled' if view.rule.disabled }}">
+        <td class="mono">{{ view.rule.order + 1 }}</td>
+        {% if show_direction %}<td>{{ view.direction | direction_word }}</td>{% endif %}
+        <td>{{ view.rule.name }}{% if view.rule.disabled %}<br><span class="tag">disabled</span>{% endif %}{% if not view.rule.action.permits_traffic %}<br><span class="blocked">⊘ {{ view.rule.action.value }}</span>{% endif %}</td>
+        {#- Names, not addresses: a printed page has no tooltip, so the object
+            name is all there is room for -- and it is the part a reader can
+            act on. The addresses stay in the interactive report and the JSON. -#}
+        <td>{{ view | asset_names(report.team.asset_labels) }}</td>
+        <td>{{ view | peer_names }}</td>
+        <td class="mono">{{ view.rule.services | services_text(8) }}</td>
+        <td>{{ view.rule.applications | join(", ") if view.rule.applications != ["any"] else "any" }}</td>
+        {% if show_findings %}
+        <td class="mono">{{ view.rule | tickets_text }}</td>
+        <td>{% for finding in view.findings %}<span class="sev sev-{{ finding.severity.value }}">{{ finding.severity.value | upper }}</span> {{ finding.title }}{{ "; " if not loop.last }}{% endfor %}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No rules in this category.</div>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{# A plain <h1> here would rewrite the running page header, which is bound to
+   the document title via string-set. #}
+<section class="part">
+  <div class="part-title">Your rules ({{ report.own_rule_count }})</div>
+  <p class="lede">Written for your address space. These are the ones to decide on.</p>
+</section>
+
+{{ rule_table(own_inbound | group_by_scope(bundle.scopes), "Inbound — who reaches your networks",
+   "Traffic from elsewhere that is permitted to reach the networks you own.", own_inbound | length) }}
+
+{{ rule_table(own_outbound | group_by_scope(bundle.scopes), "Outbound — what your networks reach",
+   "Traffic your systems are permitted to send to other networks.", own_outbound | length) }}
+
+{% if own_internal %}
+{{ rule_table(own_internal | group_by_scope(bundle.scopes), "Both ends yours",
+   "Source and destination are both networks you own, so no other team is involved.",
+   own_internal | length) }}
+{% endif %}
+
+{% if own_related %}
+{{ rule_table(own_related | group_by_scope(bundle.scopes), "No direction — attributed by label",
+   "A tag, a naming convention or a device group puts these rules with your team, without saying
+    which side of the connection you are on.", own_related | length) }}
+{% endif %}
+
+{% if covered %}
+<section class="part">
+  <div class="part-title">Rules that also cover your networks ({{ covered | length }})</div>
+  <p class="lede">Estate-wide rules maintained centrally. Nothing to decide — this is for information.</p>
+</section>
+
+{% if cov_inbound %}
+{{ rule_table(cov_inbound | group_by_scope(bundle.scopes),
+   "Inbound — who may already reach your networks",
+   "Central rules that let other systems reach yours. Exposure you did not request, which is
+    exactly why it is worth reading.", cov_inbound | length, false) }}
+{% endif %}
+
+{% if cov_outbound %}
+{{ rule_table(cov_outbound | group_by_scope(bundle.scopes),
+   "Outbound — what your networks may already reach",
+   "Central rules that let your systems out: DNS, updates, monitoring and the like. No need to
+    request any of this.", cov_outbound | length, false) }}
+{% endif %}
+
+{% if cov_other %}
+{{ rule_table(cov_other | group_by_scope(bundle.scopes), "Without a clear direction",
+   "Rules permitting any source to any destination, so no side can be called yours or theirs.",
+   cov_other | length, false, true) }}
+{% endif %}
+{% endif %}
+
+{% if report.findings %}
+<section>
+  <h2>Cleanup candidates ({{ report.findings | length }})</h2>
+  <p class="lede">
+    Findings on your own rules only, most significant first. Rules that merely cover your networks
+    are maintained by the firewall team and are not listed here.
+  </p>
+  <table>
+    <colgroup><col style="width:8%"><col style="width:16%"><col style="width:17%"><col style="width:11%"><col style="width:26%"><col style="width:22%"></colgroup>
+    <thead><tr><th>Severity</th><th>Finding</th><th>Rule</th><th>Location</th><th>Detail</th><th>Suggested action</th></tr></thead>
+    <tbody>
+      {% for finding in report.findings %}
+      <tr>
+        <td><span class="sev sev-{{ finding.severity.value }}">{{ finding.severity.value | upper }}</span></td>
+        <td>{{ finding.title }}<br><span class="tag mono">{{ finding.code }}</span></td>
+        <td>{{ finding.rule_name }}</td>
+        <td class="mono">{{ finding.location }}</td>
+        <td>{{ finding.detail }}</td>
+        <td>{{ finding.recommendation }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+{% if report.rule_count == 0 %}
+<section class="first">
+  <div class="empty">
+    No firewall rules were attributed to your team in this configuration.<br>
+    If that is unexpected, the asset inventory may be missing your networks.
+  </div>
+</section>
+{% endif %}
+
+<footer>
+  Generated by panorama-team-review {{ bundle.meta.tool_version }} from {{ bundle.meta.backup_label }}.
+  This report reflects the configuration as backed up; changes made afterwards are not included.
+</footer>
+
+</body>
+</html>

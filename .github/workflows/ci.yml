@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The privacy guard runs on its own and first: if customer data ever reaches
+  # a branch, that is the finding, and no other result matters until it is out.
+  data-guard:
+    name: No customer data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scan the whole tree
+        run: |
+          git ls-files -z | xargs -0 python tools/check_no_customer_data.py
+
+  test:
+    name: Tests (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # 3.11 is the floor because the code uses StrEnum, and because it is
+        # what Debian 12 ships -- this is an ops tool that gets installed on
+        # long-lived management hosts, not just on developer machines.
+        # 3.14 is the current release and must be covered, or the first user on
+        # a fresh system is the one who finds the breakage.
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          # The tool must run on Linux; other platforms are supported but not
+          # the primary target, so they are covered once rather than in full.
+          - os: macos-latest
+            python: "3.14"
+          - os: windows-latest
+            python: "3.14"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python }}
+
+      - name: Install PDF system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libcairo2
+
+      - name: Install the project
+        # PDF support is only installed where its system libraries are present;
+        # the suite skips those tests elsewhere, which is exactly the behaviour
+        # a user without the libraries should get.
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            uv pip install --system -e ".[dev,pdf,api]"
+          else
+            uv pip install --system -e ".[dev,api]"
+          fi
+        shell: bash
+
+      - name: Run tests
+        run: pytest -q --cov=panorama_team_review --cov-report=term-missing
+
+  lint:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.12
+      - run: uv pip install --system -e ".[dev,api]"
+      - name: ruff
+        run: ruff check src tests tools
+      - name: mypy
+        run: mypy src
+
+  end-to-end:
+    name: End-to-end run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv python install 3.12
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libcairo2
+      - run: uv pip install --system -e ".[dev,pdf]"
+
+      - name: Generate a synthetic estate and produce every report format
+        run: |
+          set -euo pipefail
+          mkdir -p e2e/backups
+          python -c "
+          import sys; sys.path.insert(0, 'tests')
+          from fixtures.generator import generate_panorama
+          open('e2e/backups/config.xml', 'w').write(generate_panorama())
+          "
+          cp config/inventory.example.yaml e2e/inventory.yaml
+          cat > e2e/config.yaml <<'EOF'
+          input:
+            backup_dir: ./backups
+          teams_file: inventory.yaml
+          output:
+            directory: ./reports
+            formats: [html, xlsx, pdf, json]
+            timestamped_subdir: false
+          EOF
+
+          pan-review -c e2e/config.yaml validate
+          pan-review -c e2e/config.yaml inspect
+          pan-review -c e2e/config.yaml -v run
+
+          test -n "$(find e2e/reports -name '*.html' -print -quit)"
+          test -n "$(find e2e/reports -name '*.xlsx' -print -quit)"
+          test -n "$(find e2e/reports -name '*.pdf'  -print -quit)"
+          test -n "$(find e2e/reports -name '*.json' -print -quit)"
+
+          # A report must be reproducible: the same input twice, same output.
+          pan-review -c e2e/config.yaml run -o ./reports-again -f json
+          pan-review diff e2e/reports/*overview.json e2e/reports-again/*overview.json \
+            --fail-on-change
+
+      - name: Confirm the run made no network connections
+        run: |
+          # Re-run with outbound traffic blocked. The tool's core promise is
+          # that it works offline; if anything reaches out, this fails.
+          sudo iptables -I OUTPUT -m owner --uid-owner "$(id -u)" -d 0.0.0.0/0 \
+            ! -o lo -j REJECT || true
+          pan-review -c e2e/config.yaml run -o ./reports-offline -f json
+          sudo iptables -D OUTPUT -m owner --uid-owner "$(id -u)" -d 0.0.0.0/0 \
+            ! -o lo -j REJECT || true

@@ -1,0 +1,59 @@
+# Example inventory -- who owns which networks.
+#
+# This maps the invented estate in ./backup/ to five teams. Nothing here comes
+# from a real configuration; see ./README.md.
+#
+# Only `id` is required. Everything else narrows or widens what a team is
+# credited with, and `pan-review validate` says so when a team has no matching
+# criteria at all.
+
+teams:
+  # A team that owns a whole /16 and is named by a tag as well. The tag is what
+  # produces the "No direction" section in its report: a tag says the rule is
+  # theirs without saying which side of the connection they are on.
+  - id: platform
+    name: Platform Services
+    contact: platform@example.com
+    assets:
+      - cidr: 10.10.0.0/16
+        label: Platform network
+      - cidr: 10.10.1.5/32
+        label: srv-platform-01 (shared services jump host)
+    tags: [owner:platform]
+    device_groups: [DG-Shared-Services]
+
+  - id: payments
+    name: Payments Platform
+    contact: payments@example.com
+    assets:
+      - cidr: 10.20.0.0/16
+        label: Payments production
+      - cidr: 10.20.1.5/32
+        label: payment-gw01 (settlement gateway)
+    tags: [owner:payments]
+
+  - id: development
+    name: Development
+    contact: dev@example.com
+    assets:
+      - cidr: 10.30.0.0/16
+        label: Development and test
+
+  - id: dmz
+    name: DMZ Operations
+    contact: dmz@example.com
+    assets:
+      - cidr: 172.16.0.0/16
+        label: Perimeter network
+
+  # Deliberately owns a single host inside another team's /16. Its report is
+  # the clearest illustration of the own/covering split: almost every rule that
+  # reaches this host names the surrounding network rather than the host, so it
+  # lands under "Rules that also cover your networks" -- access the team has,
+  # did not request, and cannot change on its own.
+  - id: reporting
+    name: Reporting Service
+    contact: reporting@example.com
+    assets:
+      - cidr: 10.20.1.7/32
+        label: rpt-01 (reporting host, inside the payments network)

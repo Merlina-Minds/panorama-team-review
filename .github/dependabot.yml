@@ -1,0 +1,52 @@
+# Dependency updates.
+#
+# Three ecosystems are in play and each needs its own entry, which is easy to
+# get wrong: pinning the Python packages while GitHub Actions and the
+# pre-commit hooks quietly rot is the usual outcome.
+#
+# Everything lands as a pull request that has to pass CI -- including the
+# customer-data guard and the end-to-end run -- so an update that breaks report
+# generation cannot merge.
+
+version: 2
+
+updates:
+  # Python dependencies declared in pyproject.toml.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    labels: [dependencies, python]
+    commit-message:
+      prefix: "deps"
+    groups:
+      # Routine patch bumps arrive as one PR rather than five.
+      patch-updates:
+        update-types: [patch]
+      dev-tooling:
+        patterns: ["pytest*", "ruff", "mypy", "types-*"]
+    ignore:
+      # Major versions of the parsing and rendering core change output or
+      # behaviour; those get looked at deliberately, not merged on a schedule.
+      - dependency-name: lxml
+        update-types: [version-update:semver-major]
+      - dependency-name: pydantic
+        update-types: [version-update:semver-major]
+      - dependency-name: weasyprint
+        update-types: [version-update:semver-major]
+
+  # The actions used by the CI workflow.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci"

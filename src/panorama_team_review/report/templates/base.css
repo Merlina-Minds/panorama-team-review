@@ -1,0 +1,677 @@
+/* Report styling.
+ *
+ * Colour is used for status only, never as the sole carrier of meaning: every
+ * severity and direction badge pairs its colour with an icon and a word, so the
+ * report stays readable in greyscale print, in forced-colours mode, and for
+ * readers with colour vision deficiency.
+ *
+ * Status steps and ink tokens follow a validated palette; both light and dark
+ * are stepped deliberately rather than flipped.
+ */
+
+:root {
+  --surface: #fcfcfb;
+  --plane: #f9f9f7;
+  --ink: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+
+  --status-critical: #d03b3b;
+  --status-serious: #ec835a;
+  --status-warning: #fab219;
+  --status-good: #0ca30c;
+
+  --tint-critical: rgba(208, 59, 59, 0.10);
+  --tint-serious: rgba(236, 131, 90, 0.12);
+  --tint-warning: rgba(250, 178, 25, 0.14);
+  --tint-neutral: rgba(137, 135, 129, 0.10);
+
+  --accent: #1f3864;
+  --link: #0563c1;
+
+  --radius: 6px;
+  --gap: 1rem;
+}
+
+/* Dark mode is a deliberate second set of steps, not an inversion of the first.
+ *
+ * The same complete set is applied twice: once for viewers whose system asks
+ * for dark, and once for viewers who pressed the theme button. Both must carry
+ * *every* token -- an earlier version listed only the surfaces here, which left
+ * the light-surface status tints on a dark background where they were nearly
+ * invisible.
+ *
+ * The :not([data-theme="light"]) guard is what lets the button override a dark
+ * system preference; without it the toggle would only work in one direction. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface: #1a1a19;
+    --plane: #0d0d0d;
+    --ink: #ffffff;
+    --ink-secondary: #c3c2b7;
+    --ink-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --tint-critical: rgba(208, 59, 59, 0.22);
+    --tint-serious: rgba(236, 131, 90, 0.20);
+    --tint-warning: rgba(250, 178, 25, 0.18);
+    --tint-neutral: rgba(195, 194, 183, 0.10);
+    --accent: #93b4ea;
+    --link: #7fb4f5;
+  }
+}
+
+:root[data-theme="dark"] {
+  --surface: #1a1a19;
+  --plane: #0d0d0d;
+  --ink: #ffffff;
+  --ink-secondary: #c3c2b7;
+  --ink-muted: #898781;
+  --grid: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --tint-critical: rgba(208, 59, 59, 0.22);
+  --tint-serious: rgba(236, 131, 90, 0.20);
+  --tint-warning: rgba(250, 178, 25, 0.18);
+  --tint-neutral: rgba(195, 194, 183, 0.10);
+  --accent: #93b4ea;
+  --link: #7fb4f5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 4rem;
+  background: var(--plane);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* --- header ------------------------------------------------------------- */
+
+/* The header stays at the top of the window. Once a three-hundred-row table
+ * has scrolled the title away there is nothing left saying whose report this
+ * is, which matters most when several are open side by side. It shrinks to one
+ * line as soon as the page moves, so the cost is a few pixels rather than a
+ * banner permanently occupying a fifth of the screen. */
+header.report {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 1.75rem 0 1rem;
+  margin-bottom: 1.5rem;
+  transition: padding 0.15s ease;
+}
+
+header.report h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+  transition: font-size 0.15s ease;
+}
+
+header.report .subject {
+  font-size: 1.05rem;
+  color: var(--ink-secondary);
+  margin-bottom: 0.75rem;
+}
+
+header.report.compact { padding: 0.5rem 0 0.4rem; }
+header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
+header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
+header.report.compact .provenance { display: none; }
+header.report.compact nav.jump { margin-top: 0.35rem; }
+
+.provenance {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+
+.provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- jump navigation ----------------------------------------------------- */
+
+nav.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.75rem;
+}
+
+nav.jump a {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+nav.jump a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Anchors have to clear the sticky header, or a jump link lands with its
+ * heading hidden behind it. */
+section.block, h2.part { scroll-margin-top: calc(var(--header-h, 5rem) + 1rem); }
+
+/* --- stat tiles --------------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  position: relative;
+  display: block;
+}
+
+/* A tile that counts something links to the section holding it. */
+a.tile { text-decoration: none; color: inherit; }
+a.tile:hover { border-color: var(--accent); }
+a.tile:hover .value { color: var(--accent); }
+
+.tile-go {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+a.tile:hover .tile-go { color: var(--accent); }
+
+.tile .value {
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile .label {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.2rem;
+}
+
+.tile .hint { font-size: 0.78rem; color: var(--ink-secondary); margin-top: 0.35rem; }
+.tile.critical { border-left: 3px solid var(--status-critical); }
+.tile.serious  { border-left: 3px solid var(--status-serious); }
+
+/* --- callouts ----------------------------------------------------------- */
+
+.callout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.callout h2 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.callout ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+.callout li { margin-bottom: 0.2rem; }
+.callout.warn { border-left-color: var(--status-warning); }
+
+/* --- controls ----------------------------------------------------------- */
+
+/* Deliberately not sticky. The row worth keeping on screen while reading a
+ * three-hundred-row table is the one naming the columns, not the filter box --
+ * a filter is set once and then left alone, and two stacked bars eat the space
+ * the table header needs. */
+.controls {
+  z-index: 20;
+  background: var(--plane);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.controls input[type="search"] {
+  flex: 1 1 260px;
+  min-width: 200px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.controls button {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.controls button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.controls .spacer { flex: 1 1 auto; }
+.controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* --- parts -------------------------------------------------------------- */
+
+/* The report is split into two parts that ask different things of the reader:
+ * rules that are the team's to decide on, and rules that merely cover them.
+ * The heading has to be unmistakably heavier than a section heading, or the
+ * distinction reads as one more table among the others. */
+
+h2.part {
+  font-size: 1.35rem;
+  margin: 2.5rem 0 0.15rem;
+  padding-top: 1.1rem;
+  border-top: 2px solid var(--baseline);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+p.part-lede {
+  color: var(--ink-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 1.25rem;
+}
+
+/* --- sections and tables ------------------------------------------------ */
+
+section.block { margin-bottom: 2rem; }
+
+section.block > h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+/* --- collapsible sections ------------------------------------------------ */
+
+h2.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  margin: 0 0 0.15rem;
+}
+
+button.collapse {
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+  font-size: 0.9rem;
+  line-height: 1;
+  align-self: center;
+}
+
+button.collapse:hover { color: var(--ink); }
+.chevron { display: inline-block; transition: transform 0.15s ease; }
+h2.section-head.collapsed .chevron { transform: rotate(-90deg); }
+
+.section-title { flex: 0 1 auto; }
+
+a.to-top {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.to-top:hover { color: var(--accent); }
+
+section.block > .lede {
+  color: var(--ink-secondary);
+  font-size: 0.88rem;
+  margin: 0 0 0.75rem;
+}
+
+.count-badge {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* No overflow, and that is the whole point.
+ *
+ * `overflow-x: auto` forces `overflow-y` to `auto` as well, which makes this
+ * element a scroll container -- and a sticky table header sticks to its nearest
+ * scroll container, not to the window. Since this box has no height limit it
+ * never scrolls vertically, so the header row had nothing to stick to and
+ * scrolled away with the rest of the table. Leaving the page as the scrollport
+ * is what makes the column names stay put.
+ *
+ * A rule table compresses to about 995px before its cells stop wrapping.
+ * Narrower than that the page itself scrolls sideways, which is the deliberate
+ * choice: an earlier version handed the overflow back to this element below
+ * 1080px, and every reader in a half-width window or at 175% zoom lost the
+ * column names without being told why. Keeping them is worth a horizontal
+ * scrollbar on a window too narrow for the table anyway. */
+.table-scroll {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* The asset and object lists sit above the rules, where they answer "is this
+ * report even about the right networks?" -- but an inventory generated from a
+ * network plan runs to hundreds of entries, and at full height it becomes a
+ * wall the reader has to scroll past before reaching a single rule. Capping it
+ * keeps the whole list available and the page navigable. This one *is* its own
+ * scrollport, so its header sticks to the top of the box instead. */
+.table-scroll.capped { max-height: 26rem; overflow-y: auto; }
+
+/* Wide content must not push the page sideways *above* the width at which the
+ * table stops fitting, so the wrapper is allowed to shrink with it. */
+.wrap { min-width: 0; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+/* The column names follow the reader down the table. --header-h is the height
+ * of the sticky page header, measured by the page itself; without the offset
+ * the header row would slide underneath it. It defaults to zero so that a page
+ * with no sticky header of its own -- the cross-team overview -- pins the
+ * column names to the top of the window rather than to thin air. */
+thead th {
+  position: sticky;
+  top: var(--header-h, 0px);
+  z-index: 5;
+  background: var(--surface);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  padding: 0.6rem 0.65rem;
+  border-bottom: 1px solid var(--baseline);
+  /* The line and the lift both matter. `border-collapse: collapse` hands the
+   * bottom border to whichever cell wins the collapse, so a scrolled-under row
+   * can take it and leave the header welded to the first line of data -- which
+   * is exactly how it looked. The first shadow redraws the rule unconditionally;
+   * the second casts the header over the rows passing beneath it, so it reads
+   * as a bar floating above the table instead of a row inside it. */
+  box-shadow: 0 1px 0 var(--baseline), 0 6px 8px -6px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+}
+
+/* Inside a box that scrolls on its own -- the capped lists, and every table
+ * once the viewport is too narrow for the columns -- the header sticks to that
+ * box, so the page-header offset would push it down over the first rows. */
+.table-scroll.capped thead th { top: 0; }
+
+tbody td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--grid);
+  vertical-align: top;
+}
+
+tbody tr.rule-row:hover { background: var(--tint-neutral); }
+tbody tr.disabled td { color: var(--ink-muted); font-style: italic; }
+tbody tr.detail-row > td { background: var(--plane); padding: 0.9rem 1rem; }
+
+/* --- policy blocks ------------------------------------------------------ */
+
+/* Rules are grouped into the blocks the firewall evaluates as a unit, in the
+ * order it evaluates them. The heading row carries the block's position, the
+ * firewalls it reaches, and how many rules it holds in total -- the last one
+ * being what tells a reader that rules they are not shown sit between the
+ * ones they are. */
+
+tbody tr.scope-row > td {
+  background: var(--plane);
+  border-top: 2px solid var(--baseline);
+  border-bottom: 1px solid var(--baseline);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+tbody tr.scope-row:first-child > td { border-top: none; }
+
+.scope-step {
+  display: inline-block;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  line-height: 1.4rem;
+  text-align: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-right: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scope-title { font-weight: 600; margin-right: 0.6rem; }
+.scope-reach { color: var(--ink-secondary); margin-right: 0.6rem; }
+.scope-count { color: var(--ink-muted); font-size: 0.78rem; }
+
+td.pos {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  width: 3.5rem;
+}
+
+.why {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--grid);
+  font-size: 0.8rem;
+  color: var(--ink-secondary);
+}
+
+td.addr, td.svc {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  max-width: 340px;
+  word-break: break-word;
+}
+
+/* --- object names, addresses behind them --------------------------------- */
+
+/* A cell of resolved addresses is unreadable to everyone outside the network
+ * team and is not what a change request cites. The object name leads; the
+ * addresses live in the tooltip. The dotted underline is what says a tooltip
+ * is there -- without it nobody hovers. */
+td.objs {
+  max-width: 320px;
+  word-break: break-word;
+  font-size: 0.82rem;
+}
+
+.named {
+  border-bottom: 1px dotted var(--baseline);
+  cursor: help;
+}
+
+.named:hover { border-bottom-color: var(--accent); color: var(--accent); }
+
+.literal {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.more { color: var(--ink-muted); font-size: 0.78rem; }
+
+td.name { font-weight: 500; min-width: 180px; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.toggle {
+  background: none;
+  border: none;
+  color: var(--link);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+/* --- badges: colour is always paired with an icon and a word ------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge .icon { font-size: 0.9em; line-height: 1; }
+
+.sev-high     { background: var(--tint-critical); border-color: var(--status-critical); }
+.sev-medium   { background: var(--tint-serious);  border-color: var(--status-serious); }
+.sev-low      { background: var(--tint-warning);  border-color: var(--status-warning); }
+.sev-info     { background: var(--tint-neutral);  border-color: var(--baseline); }
+
+/* A rule that blocks traffic must not read like one that permits it. This is
+ * the one badge that is loud on purpose. */
+.action-block {
+  background: var(--tint-critical);
+  border-color: var(--status-critical);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.dir-inbound  { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-outbound { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-internal { background: var(--tint-neutral); border-color: var(--baseline); }
+.dir-related  { background: var(--tint-neutral); border-color: var(--baseline); }
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  font-size: 0.72rem;
+  color: var(--ink-secondary);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+
+.pill.mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+a { color: var(--link); }
+a.ticket { font-weight: 500; white-space: nowrap; }
+
+/* --- detail panel ------------------------------------------------------- */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem 1.5rem;
+}
+
+.detail-grid dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+  margin-bottom: 0.15rem;
+}
+
+.detail-grid dd {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+.detail-grid dd.mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+/* A rule description is a change log, one entry per line. Collapsing the line
+ * breaks makes the ticket from one entry read as though it belonged to the
+ * date of the next. */
+.detail-grid dd.pre { white-space: pre-wrap; }
+
+.finding-item {
+  border-left: 3px solid var(--baseline);
+  padding: 0.35rem 0 0.35rem 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.finding-item.high   { border-left-color: var(--status-critical); }
+.finding-item.medium { border-left-color: var(--status-serious); }
+.finding-item.low    { border-left-color: var(--status-warning); }
+
+.finding-item .rec { color: var(--ink-secondary); font-size: 0.82rem; }
+
+.empty {
+  padding: 1.1rem;
+  text-align: center;
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px dashed var(--baseline);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+}
+
+footer.report {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+.hidden { display: none !important; }
+
+@media print {
+  .controls, .toggle { display: none !important; }
+  body { background: #fff; color: #000; font-size: 10pt; }
+  .table-scroll { overflow: visible; border: none; }
+  tbody tr { page-break-inside: avoid; }
+  section.block { page-break-before: auto; }
+}
