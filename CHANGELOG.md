@@ -127,6 +127,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A derived team inherited every tag from the objects it was built from,
+  including classification tags.** A PAN-OS tag is a classification before it
+  is anything else — it says what an object *is*, and dynamic address groups
+  are built on exactly that. Treating all of them as ownership meant that on a
+  real estate one tag sitting on 137 address groups was inherited by 107 of the
+  110 derived teams; since the tag index keeps one team per tag, all 161 rules
+  carrying it were handed to whichever team sorted last, presented as its own
+  rules with findings to work through. Which team received them depended on
+  nothing but alphabetical order.
+
+  A derived team now takes only tags that match a configured ownership
+  convention *and* name that team. On the estate this was found on, the
+  affected team went from 161 own rules and 111 findings to 2 and 0, and the
+  161 rules are attributed by address instead — which is what actually decides
+  whom they concern.
 - **The customer-data guard missed a serial attached to a hostname.**
   `\b\d{12}\b` does not match inside `<hostname>_<serial>` — an underscore is
   a word character, so there is no boundary before the digits — and that is
@@ -142,6 +157,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`ownership.tag_suffixes`**, for estates that write the team before the
+  marker: `payments-owner` alongside `owner:payments`. Empty by default,
+  because a suffix is the rarer convention and a wrong one silently claims
+  rules for the wrong team. Together with `tag_prefixes` it is now the single
+  definition of what an ownership tag looks like — used by the tag resolver and
+  by the team derivation, which previously disagreed.
+- A tag claimed by more than one team is reported in the run notes. Exactly one
+  of them receives the rules carrying it, and the choice is an accident of
+  ordering rather than a decision.
 - **`example/`** — finished reports from a complete estate, with the
   configuration and inventory that produced them, committed so that anyone
   deciding whether the tool is worth installing can read one first. Built by

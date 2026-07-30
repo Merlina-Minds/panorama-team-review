@@ -298,3 +298,69 @@ def test_ipv6_assets_are_matched():
     team = Team(id="v6", name="IPv6 team", assets=["2001:db8:20::/64"])
     rule = make_rule(source=["2001:db8:20::5/128"], destination=["2001:db8:99::/64"])
     assert resolver([team]).resolve(rule).teams["v6"].direction == "outbound"
+
+
+# ---------------------------------------------------------------------------
+# What counts as an ownership tag
+# ---------------------------------------------------------------------------
+
+
+def _candidate(tag: str, **kwargs):
+    from panorama_team_review.config import OwnershipConfig
+    from panorama_team_review.resolve.ownership import ownership_tag_team
+
+    return ownership_tag_team(tag, OwnershipConfig(**kwargs))
+
+
+def test_a_prefix_convention_names_a_team():
+    assert _candidate("owner:payments") == "payments"
+    assert _candidate("team:payments") == "payments"
+
+
+def test_a_suffix_convention_names_a_team():
+    """For estates that write the team first."""
+    assert _candidate("payments-owner", tag_suffixes=["-owner"]) == "payments"
+    assert _candidate("payments_team", tag_suffixes=["_team"]) == "payments"
+
+
+def test_a_classification_tag_names_nobody():
+    """The normal use of a PAN-OS tag, and the reason this function exists.
+
+    `GlobalProtect-Clients` says what an object *is* -- it is what dynamic
+    address groups are built from. Reading it as an owner is how one tag came
+    to hand a hundred and sixty rules to a team that had nothing to do with
+    them.
+    """
+    for tag in ("GlobalProtect-Clients", "Outdated-Object", "OnPrem", "IT-Security"):
+        assert _candidate(tag) is None, tag
+
+
+def test_no_convention_configured_means_no_ownership_tags():
+    assert _candidate("owner:payments", tag_prefixes=[], tag_suffixes=[]) is None
+
+
+def test_the_separator_a_convention_leaves_behind_is_stripped():
+    assert _candidate("owner: payments") == "payments"
+    assert _candidate("owner:-payments") == "payments"
+    assert _candidate("owner:") is None
+
+
+def test_case_sensitivity_is_honoured():
+    assert _candidate("Owner:Payments") == "Payments"
+    assert _candidate("Owner:Payments", tag_case_sensitive=True) is None
+    assert _candidate("owner:Payments", tag_case_sensitive=True) == "Payments"
+
+
+def test_a_suffix_tag_attributes_a_rule_to_its_team():
+    from panorama_team_review.config import OwnershipConfig
+    from panorama_team_review.model import Location, SecurityRule, Team
+    from panorama_team_review.resolve.ownership import OwnershipResolver
+
+    rule = SecurityRule(name="r", location=Location(source="x"), tags=["payments-owner"])
+    resolver = OwnershipResolver(
+        [Team(id="payments", name="Payments")],
+        OwnershipConfig(tag_suffixes=["-owner"]),
+    )
+    attribution = resolver.resolve(rule)
+    assert "payments" in attribution.teams
+    assert attribution.teams["payments"].coverage == "own"

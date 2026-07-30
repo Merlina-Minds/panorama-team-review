@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -177,8 +178,35 @@ def _warn_overlapping_assets(teams: list[Team]) -> list[str]:
 
 
 def inventory_warnings(teams: list[Team]) -> list[str]:
-    """Public accessor for overlap warnings, surfaced in the report."""
-    return _warn_overlapping_assets(teams)
+    """Public accessor for the warnings surfaced in the report."""
+    return _warn_overlapping_assets(teams) + _warn_contested_tags(teams)
+
+
+def _warn_contested_tags(teams: list[Team]) -> list[str]:
+    """Tags that more than one team claims.
+
+    The tag index maps a tag to exactly one team, so a contested tag silently
+    hands every rule carrying it to whichever team happens to be written last
+    -- and moving a line in the inventory then moves a block of rules between
+    reports. Saying so is the difference between a decision and an accident.
+    """
+    owners: dict[str, list[str]] = defaultdict(list)
+    for team in teams:
+        for tag in team.tags:
+            owners[tag.lower()].append(team.id)
+
+    warnings = []
+    for tag, claimants in sorted(owners.items()):
+        if len(claimants) < 2:
+            continue
+        shown = ", ".join(sorted(claimants)[:5])
+        more = f" and {len(claimants) - 5} more" if len(claimants) > 5 else ""
+        warnings.append(
+            f"tag {tag!r} is claimed by {len(claimants)} teams ({shown}{more}); "
+            "every rule carrying it is attributed to only one of them, so this is "
+            "almost certainly a classification tag rather than an ownership one"
+        )
+    return warnings
 
 
 def expand_path(value: str | os.PathLike[str]) -> Path:

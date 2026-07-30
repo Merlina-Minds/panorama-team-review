@@ -102,8 +102,21 @@ ownership:
   # broad device-group assignment does not drown out a precise tag.
   stop_after_first_match: true
 
-  # A tag 'owner:payments' assigns the rule to the team with id 'payments'.
+  # A PAN-OS tag is a classification first: 'GlobalProtect-Clients' or
+  # 'Outdated-Object' say what an object IS, and dynamic address groups are
+  # built on exactly that. Ownership-by-tag is a convention an estate adds on
+  # top, and the tool can only read it once you have written down what it looks
+  # like -- which is what these two settings are.
+  #
+  #   tag_prefixes: ["owner:"]   ->  'owner:payments'  names team 'payments'
+  #   tag_suffixes: ["-owner"]   ->  'payments-owner'  names team 'payments'
+  #
+  # Everything not shaped this way is treated as a classification and ignored
+  # for ownership. If your estate tags nothing for ownership, set both to []
+  # and lose nothing -- attribution then comes from the inventory, which is
+  # where it is most reliable anyway.
   tag_prefixes: ["owner:", "team:"]
+  tag_suffixes: []
   tag_case_sensitive: false
 
   # Global patterns applied to every rule name. Must capture a group named

@@ -290,3 +290,28 @@ def test_overlap_warnings_are_capped(tmp_path):
     warnings = inventory_warnings(load_inventory(tmp_path / "overlap.yaml"))
     assert len(warnings) <= 51
     assert any("further asset overlaps" in warning for warning in warnings)
+
+
+def test_a_contested_tag_is_reported():
+    """A tag mapping to one team means a shared tag silently picks a winner."""
+    from panorama_team_review.model import Team
+    from panorama_team_review.resolve.inventory import inventory_warnings
+
+    teams = [
+        Team(id="alpha", name="Alpha", tags=["shared-classification"]),
+        Team(id="beta", name="Beta", tags=["shared-classification"]),
+        Team(id="gamma", name="Gamma", tags=["owner:gamma"]),
+    ]
+    warnings = [w for w in inventory_warnings(teams) if "claimed by" in w]
+    assert len(warnings) == 1
+    assert "shared-classification" in warnings[0]
+    assert "alpha" in warnings[0] and "beta" in warnings[0]
+    assert "classification tag" in warnings[0]
+
+
+def test_an_uncontested_tag_is_not_reported():
+    from panorama_team_review.model import Team
+    from panorama_team_review.resolve.inventory import inventory_warnings
+
+    teams = [Team(id="alpha", name="Alpha", tags=["owner:alpha"])]
+    assert [w for w in inventory_warnings(teams) if "claimed by" in w] == []

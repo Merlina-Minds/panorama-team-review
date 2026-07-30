@@ -114,7 +114,7 @@ and the distinction is the core of the design:
 |---|---|---|
 | `inventory` | The rule's resolved networks vs. the team's assets | **yes** |
 | `zone` | A `from`/`to` zone assigned to the team | **yes** |
-| `tag` | A rule tag such as `owner:payments` | no |
+| `tag` | A rule tag matching a configured ownership convention, such as `owner:payments` | no |
 | `regex` | Rule name or description pattern | no |
 | `device_group` | The device group the rule lives in | no |
 
@@ -124,6 +124,12 @@ a team without direction, and those land in a `related` section.
 
 `inventory` always runs. The others honour `stop_after_first_match`, so a
 precise tag is not drowned out by a broad device-group assignment.
+
+The `tag` resolver reads only tags shaped like the convention you configure in
+`ownership.tag_prefixes` / `tag_suffixes`. A PAN-OS tag is a classification
+first — `GlobalProtect-Clients` says what an object is, and dynamic address
+groups are built on that — so anything not matching the convention is left
+alone rather than read as an owner.
 
 ### Your rules, and the rules that merely cover you
 

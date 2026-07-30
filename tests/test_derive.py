@@ -392,3 +392,67 @@ def test_a_rule_between_two_teams_appears_in_both_reports():
     by_id = {report.team.id: report for report in bundle.teams}
     assert [v.rule.name for v in by_id["alpha"].outbound] == ["alpha-to-beta"]
     assert [v.rule.name for v in by_id["beta"].inbound] == ["alpha-to-beta"]
+
+
+# ---------------------------------------------------------------------------
+# Which tags a derived team takes from the objects it was built from
+# ---------------------------------------------------------------------------
+
+
+def _derive_with_tags(group_tags, **ownership):
+    """One address group, one derived team, whatever tags you hand it."""
+    from panorama_team_review.config import DerivedTeamRule, OwnershipConfig
+
+    snap = snapshot(
+        addresses=[
+            AddressObject(name="a", kind=AddressKind.IP_NETMASK, value="10.1.0.0/24",
+                          location=loc())
+        ],
+        address_groups=[
+            AddressGroup(name="awsgrp-shop", members=["a"], tags=group_tags, location=loc())
+        ],
+    )
+    config = OwnershipConfig(
+        derive_teams=[
+            DerivedTeamRule(id="aws", source="address-group",
+                            pattern=r"^awsgrp-(?P<team>.+)$", team_id="{team}")
+        ],
+        **ownership,
+    )
+    result = derive_teams(snap, build_index(snap), config)
+    return result.teams[0]
+
+
+def test_a_classification_tag_is_not_inherited():
+    """The bug this exists for.
+
+    A tag on an address group says what the object is -- it is what dynamic
+    address groups are built from. Taken as ownership, one such tag made every
+    derived team claim it, and because the tag index keeps one team per tag,
+    every rule carrying it landed on whichever team sorted last, as its own
+    work to review.
+    """
+    team = _derive_with_tags(["GlobalProtect-Clients", "OnPrem", "Outdated-Object"])
+    assert team.tags == []
+
+
+def test_an_ownership_tag_naming_this_team_is_inherited():
+    team = _derive_with_tags(["owner:shop", "GlobalProtect-Clients"])
+    assert team.tags == ["owner:shop"]
+
+
+def test_an_ownership_tag_naming_a_different_team_is_not_inherited():
+    """Otherwise this team quietly answers for another one's rules."""
+    team = _derive_with_tags(["owner:payments"])
+    assert team.tags == []
+
+
+def test_a_suffix_convention_is_inherited_too():
+    team = _derive_with_tags(["shop-owner"], tag_suffixes=["-owner"])
+    assert team.tags == ["shop-owner"]
+
+
+def test_without_a_convention_nothing_is_inherited():
+    """An estate that does not tag for ownership inherits nothing, correctly."""
+    team = _derive_with_tags(["owner:shop"], tag_prefixes=[], tag_suffixes=[])
+    assert team.tags == []

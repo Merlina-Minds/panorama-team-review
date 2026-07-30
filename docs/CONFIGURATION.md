@@ -179,6 +179,7 @@ ownership:
   order: [inventory, tag, regex, device_group, zone]
   stop_after_first_match: true
   tag_prefixes: ["owner:", "team:"]
+  tag_suffixes: []
   tag_case_sensitive: false
   name_patterns: []
   description_patterns: []
@@ -285,6 +286,36 @@ ownership:
 They must contain a named group `team`, and the captured value must be a team
 id from the inventory. Per-team patterns without a capture group go in the
 inventory's `name_patterns` instead.
+
+### `tag_prefixes` and `tag_suffixes` — what counts as an ownership tag
+
+A PAN-OS tag is a **classification** before it is anything else. `GlobalProtect-Clients`,
+`Outdated-Object`, `OnPrem` say what an object *is*; dynamic address groups are
+built on precisely that. Ownership-by-tag is a convention an estate adds on top,
+and the tool can only read it once the convention is written down:
+
+```yaml
+ownership:
+  tag_prefixes: ["owner:"]   # 'owner:payments' names team 'payments'
+  tag_suffixes: ["-owner"]   # 'payments-owner' names team 'payments'
+```
+
+A tag not shaped that way is treated as a classification and ignored for
+ownership. Both empty means no tag ever attributes a rule, which is the right
+answer for an estate that does not tag for ownership — attribution then comes
+from the inventory.
+
+This also governs what a **derived** team inherits. A team built from an address
+group takes only the tags that name *it*; it used to take all of them, and on a
+real estate one classification tag sitting on 137 address groups was inherited
+by 107 of 110 derived teams. Since the tag index keeps one team per tag, all 161
+rules carrying it were attributed to whichever team sorted last — as its own
+rules, with findings, to review. Which team that was depended on nothing but
+alphabetical order.
+
+A tag claimed by more than one team is reported in the run notes for the same
+reason: exactly one of them will receive the rules, and the choice is an
+accident of ordering rather than a decision.
 
 ### `match_mode`
 

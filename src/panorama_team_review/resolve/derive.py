@@ -28,6 +28,7 @@ from ..config import DerivedTeamRule, OwnershipConfig
 from ..model import Snapshot, Team
 from .objects import ObjectIndex, resolve_addresses
 from .objects import ResolvedAddresses as _ResolvedAddresses  # noqa: F401
+from .ownership import ownership_tag_team
 
 
 @dataclass
@@ -50,7 +51,7 @@ def derive_teams(
 
     for rule in config.derive_teams:
         before = len(collected)
-        matched = _apply_rule(rule, snapshot, index, collected)
+        matched = _apply_rule(rule, snapshot, index, collected, config)
         result.matched_by_rule[rule.id] = matched
         if matched == 0:
             result.notes.append(
@@ -86,6 +87,7 @@ def derive_teams(
 class _Accumulator:
     """Everything gathered for one derived team while scanning."""
 
+    team_id: str = ""
     name: str = ""
     contact: str | None = None
     min_assets: int = 1
@@ -102,6 +104,28 @@ class _Accumulator:
         self.networks.append(net)
         self.labels.setdefault(str(net), label)
 
+    def inherit_tags(self, tags: list[str], config: OwnershipConfig) -> None:
+        """Take only a tag that names *this* team as its owner.
+
+        A tag on an address object is a classification -- what the object is,
+        and what dynamic groups it falls into. Taking all of them made every
+        derived team claim every type tag its objects happened to carry, and
+        the tag resolver then handed it whole classes of rule. On the estate
+        this was found on, one tag sat on 137 address groups, 107 of the 110
+        derived teams inherited it, and because the tag index keeps one team
+        per tag, all 161 rules carrying it landed on whichever team sorted
+        last -- as *its own rules*, to review.
+
+        So: only tags shaped like the configured ownership convention, and
+        only when they name this team. An estate with no such convention
+        inherits nothing, which is the correct answer rather than a missing
+        feature.
+        """
+        for tag in tags:
+            named = ownership_tag_team(tag, config)
+            if named and _same_tag(named, self.team_id, config):
+                self.tags.add(tag)
+
     def describe(self) -> str:
         origin = ", ".join(sorted(self.sources)[:3])
         return f"Derived from {origin}" if origin else "Derived from naming convention"
@@ -117,15 +141,18 @@ def _apply_rule(
     snapshot: Snapshot,
     index: ObjectIndex,
     collected: dict[str, _Accumulator],
+    config: OwnershipConfig,
 ) -> int:
     pattern = re.compile(rule.pattern)
     exclude = re.compile(rule.exclude_pattern) if rule.exclude_pattern else None
     matched = 0
 
     if rule.source == "address-group":
-        matched = _from_address_groups(rule, pattern, exclude, snapshot, index, collected)
+        matched = _from_address_groups(
+            rule, pattern, exclude, snapshot, index, collected, config
+        )
     elif rule.source == "address-object":
-        matched = _from_address_objects(rule, pattern, exclude, snapshot, collected)
+        matched = _from_address_objects(rule, pattern, exclude, snapshot, collected, config)
     elif rule.source == "tag":
         matched = _from_tags(rule, pattern, exclude, snapshot, collected)
 
@@ -139,6 +166,7 @@ def _from_address_groups(
     snapshot: Snapshot,
     index: ObjectIndex,
     collected: dict[str, _Accumulator],
+    config: OwnershipConfig,
 ) -> int:
     """One team per matching address group; its assets are the group's members.
 
@@ -161,7 +189,7 @@ def _from_address_groups(
         acc.sources.add(f"address group {group.name!r}")
         for cidr in resolved.networks:
             acc.add(ipaddress.ip_network(cidr), group.name)
-        acc.tags.update(group.tags)
+        acc.inherit_tags(group.tags, config)
     return matched
 
 
@@ -171,6 +199,7 @@ def _from_address_objects(
     exclude: re.Pattern[str] | None,
     snapshot: Snapshot,
     collected: dict[str, _Accumulator],
+    config: OwnershipConfig,
 ) -> int:
     """One team per capture; assets are the objects whose names matched."""
     matched = 0
@@ -186,7 +215,7 @@ def _from_address_objects(
         acc.sources.add(f"address objects matching {rule.pattern!r}")
         for net in _networks_of(address):
             acc.add(net, address.description or address.name)
-        acc.tags.update(address.tags)
+        acc.inherit_tags(address.tags, config)
     return matched
 
 
@@ -230,6 +259,7 @@ def _accumulator(
     acc = collected.get(team_id)
     if acc is None:
         acc = _Accumulator(
+            team_id=team_id,
             name=_format(rule.team_name or rule.team_id, values) or team_id,
             contact=_format(rule.contact, values) if rule.contact else None,
             min_assets=rule.min_assets,
@@ -336,3 +366,7 @@ def merge_teams(explicit: list[Team], derived: list[Team]) -> tuple[list[Team], 
             )
 
     return sorted(by_id.values(), key=lambda t: t.id), notes
+
+
+def _same_tag(left: str, right: str, config: OwnershipConfig) -> bool:
+    return left == right if config.tag_case_sensitive else left.lower() == right.lower()

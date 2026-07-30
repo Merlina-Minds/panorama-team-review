@@ -329,14 +329,10 @@ class OwnershipResolver:
             evidence = f"tag {tag!r} listed for this team"
 
             if team_id is None:
-                for prefix in self.config.tag_prefixes:
-                    prefix_norm = self._normalise_tag(prefix)
-                    if normalised.startswith(prefix_norm):
-                        candidate = tag[len(prefix):].strip()
-                        if candidate in self._by_id:
-                            team_id = candidate
-                            evidence = f"tag {tag!r} names team {candidate!r}"
-                        break
+                candidate = ownership_tag_team(tag, self.config)
+                if candidate and candidate in self._by_id:
+                    team_id = candidate
+                    evidence = f"tag {tag!r} names team {candidate!r}"
 
             if team_id is not None:
                 self._add_related(attribution, team_id, "tag", evidence)
@@ -509,6 +505,42 @@ class OwnershipResolver:
             for view in attribution.teams.values()
             for match in view.matches
         )
+
+
+def ownership_tag_team(tag: str, config: OwnershipConfig) -> str | None:
+    """The team id an ownership tag names, or None if it names none.
+
+    A tag in PAN-OS is a classification before it is anything else --
+    ``GlobalProtect-Clients`` says what an object *is*, and dynamic address
+    groups are built on precisely that. Ownership-by-tag is a convention an
+    estate adds on top, and it is only legible once the estate has written the
+    convention down. That is what ``tag_prefixes`` and ``tag_suffixes`` are:
+    the statement "a tag shaped like this names an owner". Anything not shaped
+    that way is a type, and this returns None for it.
+
+    Shared with the team derivation, which needs the same question answered
+    before any team exists to compare against -- so this decides on shape
+    alone and leaves "does that team exist?" to the caller.
+    """
+    normalised = tag if config.tag_case_sensitive else tag.lower()
+
+    for prefix in config.tag_prefixes:
+        marker = prefix if config.tag_case_sensitive else prefix.lower()
+        if marker and normalised.startswith(marker):
+            return _clean_tag_value(tag[len(prefix):])
+
+    for suffix in config.tag_suffixes:
+        marker = suffix if config.tag_case_sensitive else suffix.lower()
+        if marker and normalised.endswith(marker):
+            return _clean_tag_value(tag[: len(tag) - len(suffix)])
+
+    return None
+
+
+def _clean_tag_value(value: str) -> str | None:
+    """Strip the separators a convention leaves behind, e.g. 'owner: payments'."""
+    cleaned = value.strip().strip(":-_ ").strip()
+    return cleaned or None
 
 
 def _combine_directions(existing: Direction, incoming: Direction) -> Direction:

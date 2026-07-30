@@ -282,9 +282,24 @@ class OwnershipConfig(ConfigModel):
     stop_after_first_match: bool = True
 
     # -- tag resolver
+    #
+    # A PAN-OS tag is a *classification* before it is anything else: it says
+    # what an object is, and dynamic address groups are built on exactly that.
+    # `GlobalProtect-Clients` or `Outdated-Object` name a kind of object, not
+    # an owner. Ownership-by-tag is a convention an estate adds on top, and the
+    # tool can only read it once the estate has said what it looks like -- which
+    # is what these two settings are for. An estate that tags nothing for
+    # ownership sets both to [] and loses nothing.
     tag_prefixes: list[str] = Field(
         default_factory=lambda: ["owner:", "team:"],
         description="A tag 'owner:payments' assigns the rule to team id 'payments'",
+    )
+    tag_suffixes: list[str] = Field(
+        default_factory=list,
+        description="The same the other way round, for estates that write the team first: "
+        "with '-owner', a tag 'payments-owner' assigns the rule to team id 'payments'. "
+        "Empty by default, because a suffix is the rarer convention and a wrong one "
+        "silently claims rules for the wrong team.",
     )
     tag_case_sensitive: bool = False
 
