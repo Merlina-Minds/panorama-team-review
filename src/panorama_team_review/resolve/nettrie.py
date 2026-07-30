@@ -125,6 +125,21 @@ def _collect_subtree(node: _Node[T]) -> list[tuple[IPNetwork, T]]:
     return out
 
 
+def contains(outer: IPNetwork, inner: IPNetwork) -> bool:
+    """Whether ``outer`` fully contains ``inner``.
+
+    ``subnet_of`` raises on a mixed-version pair rather than returning False,
+    so the version check is part of the question and not a caller's chore.
+    Written as two narrowed branches because that is also what makes it
+    type-check: the signature accepts either family, ``subnet_of`` does not.
+    """
+    if isinstance(outer, ipaddress.IPv4Network) and isinstance(inner, ipaddress.IPv4Network):
+        return inner.subnet_of(outer)
+    if isinstance(outer, ipaddress.IPv6Network) and isinstance(inner, ipaddress.IPv6Network):
+        return inner.subnet_of(outer)
+    return False
+
+
 def _coerce(network: IPNetwork | str) -> IPNetwork:
     if isinstance(network, str):
         return ipaddress.ip_network(network, strict=False)

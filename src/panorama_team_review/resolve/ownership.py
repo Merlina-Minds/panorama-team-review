@@ -39,7 +39,7 @@ from typing import Literal
 
 from ..config import OwnershipConfig
 from ..model import Coverage, IPNetwork, OwnerMatch, ResolvedAddresses, SecurityRule, Team
-from .nettrie import NetworkTrie
+from .nettrie import NetworkTrie, contains
 
 Direction = Literal["inbound", "outbound", "internal", "related"]
 
@@ -167,10 +167,16 @@ class OwnershipResolver:
         """Determine which teams a rule belongs to and how."""
         attribution = Attribution()
 
+        # inventory runs first, exactly once, and outside the cascade --
+        # wherever `order` puts it, and whether or not `order` names it at all.
+        # It is the only resolver that knows inbound from outbound, and letting
+        # an earlier tag match end the loop before it ran cost the report the
+        # direction, the peer team and the matched networks: the rule still
+        # reached the team, but as a bare 'related' entry.
+        self._resolve_inventory(rule, attribution)
+
         for method in self.config.order:
-            if method == "inventory":
-                self._resolve_inventory(rule, attribution)
-            elif method == "tag":
+            if method == "tag":
                 self._resolve_tag(rule, attribution)
             elif method == "regex":
                 self._resolve_regex(rule, attribution)
@@ -178,15 +184,12 @@ class OwnershipResolver:
                 self._resolve_device_group(rule, attribution)
             elif method == "zone":
                 self._resolve_zone(rule, attribution)
+            else:
+                continue  # inventory -- handled above.
 
-            # stop_after_first_match applies only to the non-directional
-            # methods: inventory must always run, since it is the only source
-            # of inbound/outbound information.
-            if (
-                self.config.stop_after_first_match
-                and method != "inventory"
-                and self._has_match_from(attribution, method)
-            ):
+            # The cascade covers only the non-directional methods, so that a
+            # precise tag is not drowned out by a broad device group.
+            if self.config.stop_after_first_match and self._has_match_from(attribution, method):
                 break
 
         self._handle_any_any(rule, attribution)
@@ -284,7 +287,7 @@ class OwnershipResolver:
         for cidr in side.networks:
             net = ipaddress.ip_network(cidr)
             for asset_net, team_id in self._trie.find_overlaps(net):
-                if self.config.match_mode == "contained" and not _contained(net, asset_net):
+                if self.config.match_mode == "contained" and not contains(asset_net, net):
                     continue
                 hits[team_id].append(
                     AssetHit(
@@ -299,7 +302,7 @@ class OwnershipResolver:
         """Is the rule's network inside the team's, rather than around it?"""
         if rule_net.version != asset.version:
             return False
-        if _contained(rule_net, asset):
+        if contains(asset, rule_net):
             return True
         # Tolerance for estates whose inventory lists individual hosts: a rule
         # naming the /24 those hosts sit in is still recognisably about them,
@@ -550,11 +553,6 @@ def _combine_directions(existing: Direction, incoming: Direction) -> Direction:
         return existing if incoming == "related" else incoming
     # outbound + inbound seen for the same team means both sides are theirs.
     return "internal"
-
-
-def _contained(inner: ipaddress.IPv4Network | ipaddress.IPv6Network,
-               outer: ipaddress.IPv4Network | ipaddress.IPv6Network) -> bool:
-    return inner.version == outer.version and inner.subnet_of(outer)  # type: ignore[arg-type]
 
 
 def _merge(existing: list[str], incoming: list[str]) -> list[str]:

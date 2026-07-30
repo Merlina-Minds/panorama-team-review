@@ -163,9 +163,7 @@ def _highlight_objects(field: ResolvedAddresses, highlight: list[str], limit: in
 
     wanted = set(highlight)
     parts = []
-    for member in field.members[:limit] or [None]:
-        if member is None:
-            break
+    for member in field.members[:limit]:
         text = escape(member.name)
         matched = any(cidr in wanted for cidr in member.networks)
         parts.append(Markup("<strong>{}</strong>").format(text) if matched else text)

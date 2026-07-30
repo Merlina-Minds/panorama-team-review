@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
+from typing import Literal
 
 from ..model import (
     DeviceGroup,
@@ -59,7 +60,9 @@ STAGE_DEFAULT = 3
 # makes the same arithmetic produce both.
 _SHARED_DEPTH = -1
 
-_STAGE_NAMES = {
+# Annotated rather than inferred: `PolicyScope.stage` is a Literal, and an
+# inferred `dict[int, str]` would let a typo reach the model unchecked.
+_STAGE_NAMES: dict[int, Literal["pre", "local", "post", "default"]] = {
     STAGE_PRE: "pre",
     STAGE_LOCAL: "local",
     STAGE_POST: "post",

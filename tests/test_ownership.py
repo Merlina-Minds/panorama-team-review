@@ -7,6 +7,8 @@ misleading. These tests pin the inbound/outbound/internal decision precisely.
 
 from __future__ import annotations
 
+import pytest
+
 from panorama_team_review.config import OwnershipConfig
 from panorama_team_review.model import (
     Location,
@@ -256,12 +258,65 @@ def test_stop_after_first_match_prefers_the_earlier_resolver():
     assert set(loose.resolve(rule).teams) == {"alpha", "beta"}
 
 
-def test_inventory_always_runs_even_when_a_later_resolver_matches():
-    """Direction information must never be lost to the cascade."""
+@pytest.mark.parametrize(
+    "order",
+    [
+        ["inventory", "tag", "regex", "device_group", "zone"],
+        ["tag", "inventory"],
+        ["tag", "regex", "device_group", "zone", "inventory"],
+        ["device_group", "tag", "inventory"],
+        ["tag"],  # inventory not configured at all
+    ],
+)
+def test_inventory_always_runs_whatever_the_order_says(order):
+    """Direction information must never be lost to the cascade.
+
+    The documented contract is that `inventory` runs regardless of `order` and
+    `stop_after_first_match`, because it is the only resolver that can tell
+    inbound from outbound. Putting a matching tag ahead of it used to end the
+    loop first, and the rule then reached the team as a bare 'related' entry
+    with no direction, no peer and no matched network -- the failure this
+    parametrisation exists to catch, since the default order hides it.
+    """
+    alpha = Team(id="alpha", name="Alpha", assets=["10.1.0.0/16"], tags=["owner:alpha"])
+    beta = Team(id="beta", name="Beta", assets=["10.9.0.0/16"], device_groups=["DG-Prod"])
+    rule = make_rule(
+        source=["10.1.1.0/24"],
+        destination=["10.9.9.0/24"],
+        tags=["owner:alpha"],
+        device_group="DG-Prod",
+    )
+
+    attribution = OwnershipResolver(
+        [alpha, beta], OwnershipConfig(order=order, stop_after_first_match=True)
+    ).resolve(rule)
+
+    view = attribution.teams["alpha"]
+    assert view.direction == "outbound"
+    assert view.matched_assets == ["10.1.0.0/16"]
+    assert view.peers == ["10.9.9.0/24"]
+    # The peer team is inventory's second contribution, and it is just as
+    # invisible to the other resolvers as the direction is.
+    assert view.peer_teams == ["beta"]
+
+
+def test_inventory_runs_once_when_the_cascade_does_not_stop():
+    """Hoisting inventory out of the loop must not make it run twice.
+
+    A doubled run is invisible in the direction but not in the evidence: the
+    matched networks and the match list would each carry every hit twice.
+    """
     alpha = Team(id="alpha", name="Alpha", assets=["10.1.0.0/16"], tags=["owner:alpha"])
     rule = make_rule(source=["10.1.1.0/24"], destination=["10.9.9.0/24"], tags=["owner:alpha"])
-    attribution = OwnershipResolver([alpha], OwnershipConfig()).resolve(rule)
-    assert attribution.teams["alpha"].direction == "outbound"
+
+    attribution = OwnershipResolver(
+        [alpha],
+        OwnershipConfig(order=["inventory", "tag"], stop_after_first_match=False),
+    ).resolve(rule)
+
+    view = attribution.teams["alpha"]
+    assert view.matched_assets == ["10.1.0.0/16"]
+    assert [match.method for match in view.matches] == ["inventory", "tag"]
 
 
 def test_resolver_order_is_configurable():

@@ -9,6 +9,7 @@ from datetime import date
 import pytest
 
 from panorama_team_review.config import Config, OutputConfig, ReportConfig
+from panorama_team_review.model import AddressMember, ResolvedAddresses
 from panorama_team_review.report import excel, html, json_report, pdf
 from panorama_team_review.report.build import build_report
 
@@ -731,3 +732,44 @@ def test_a_long_peer_team_list_collapses_to_a_count():
     assert len(cell.label) < 20
 
     assert fmt.peer_team_cell(RuleView(rule=rule, direction="outbound")) is None
+
+
+# ---------------------------------------------------------------------------
+# Object-name highlighting
+# ---------------------------------------------------------------------------
+
+
+def test_object_names_fall_back_to_the_raw_field_without_a_breakdown():
+    """A rule whose objects never resolved must still name them.
+
+    ``members`` is empty whenever resolution failed -- an external dynamic list,
+    a group defined on a device whose configuration is not in the backup. The
+    object name is then the only thing the report can offer, and dropping it
+    would leave an empty cell where the rule's whole subject belongs.
+    """
+    field = ResolvedAddresses(raw=["grp-unresolved", "ext-list-partners"])
+    rendered = html._highlight_objects(field, highlight=[])
+    assert "grp-unresolved" in rendered
+    assert "ext-list-partners" in rendered
+    assert "<strong>" not in rendered
+
+
+def test_object_names_bold_only_the_member_that_matched():
+    field = ResolvedAddresses(
+        raw=["grp-payments", "grp-other"],
+        networks=["10.20.12.0/24", "10.99.0.0/16"],
+        members=[
+            AddressMember(name="grp-payments", networks=["10.20.12.0/24"]),
+            AddressMember(name="grp-other", networks=["10.99.0.0/16"]),
+        ],
+    )
+    rendered = html._highlight_objects(field, highlight=["10.20.12.0/24"])
+    assert "<strong>grp-payments</strong>" in rendered
+    assert "<strong>grp-other</strong>" not in rendered
+    assert "grp-other" in rendered
+
+
+def test_object_names_of_an_empty_field_render_to_nothing():
+    """Neither members nor raw: an empty cell, not a crash or a stray marker."""
+    assert html._highlight_objects(ResolvedAddresses(), highlight=[]) == ""
+    assert html._highlight_objects(ResolvedAddresses(is_any=True), highlight=[]) == "any"

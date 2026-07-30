@@ -10,7 +10,7 @@ import ipaddress
 
 import pytest
 
-from panorama_team_review.resolve.nettrie import NetworkTrie
+from panorama_team_review.resolve.nettrie import NetworkTrie, contains
 
 
 def payloads(results) -> set[str]:
@@ -144,3 +144,48 @@ def test_overlap_matches_ipaddress_semantics(stored, query, expected):
     found = bool(trie.find_overlaps(query))
     assert found is expected
     assert found is ipaddress.ip_network(stored).overlaps(ipaddress.ip_network(query))
+
+
+# ---------------------------------------------------------------------------
+# Containment
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("outer", "inner", "expected"),
+    [
+        ("10.0.0.0/8", "10.1.0.0/16", True),
+        ("10.0.0.0/8", "10.0.0.0/8", True),  # a network contains itself
+        ("10.1.0.0/16", "10.0.0.0/8", False),  # the wider one is not inside
+        ("10.0.0.0/8", "192.168.0.0/16", False),
+        ("2001:db8::/32", "2001:db8:1::/48", True),
+        ("2001:db8:1::/48", "2001:db8::/32", False),
+    ],
+)
+def test_contains_agrees_with_subnet_of(outer, inner, expected):
+    left = ipaddress.ip_network(outer)
+    right = ipaddress.ip_network(inner)
+    assert contains(left, right) is expected
+    assert contains(left, right) is right.subnet_of(left)
+
+
+@pytest.mark.parametrize(
+    ("outer", "inner"),
+    [
+        ("10.0.0.0/8", "2001:db8::/32"),
+        ("2001:db8::/32", "10.0.0.0/8"),
+        ("::/0", "0.0.0.0/0"),
+    ],
+)
+def test_contains_answers_false_for_a_mixed_family_pair(outer, inner):
+    """A v4/v6 pair is a question with an answer, not an error.
+
+    ``subnet_of`` raises TypeError on a mixed pair, so every caller that drops
+    the version guard turns an ordinary miss into a crash mid-report. The guard
+    belongs here, once, rather than at each call site where it can be dropped.
+    """
+    left = ipaddress.ip_network(outer)
+    right = ipaddress.ip_network(inner)
+    assert contains(left, right) is False
+    with pytest.raises(TypeError):
+        right.subnet_of(left)

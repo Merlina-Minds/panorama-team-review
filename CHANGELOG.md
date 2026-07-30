@@ -127,6 +127,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A configured resolver order could skip the inventory entirely.** The
+  documented contract is that `inventory` runs regardless of `order` and
+  `stop_after_first_match`, because it is the only resolver that can tell
+  inbound from outbound. The cascade honoured that only for the default order:
+  with `order: [tag, inventory]`, a matching tag ended the loop before the
+  inventory ran, and the rule reached the team as a bare *related* entry — no
+  direction, no peer team, no matched network — while looking like a complete
+  attribution. `inventory` now runs first and outside the cascade, whether or
+  not `order` names it.
+
 - **A derived team inherited every tag from the objects it was built from,
   including classification tags.** A PAN-OS tag is a classification before it
   is anything else — it says what an object *is*, and dynamic address groups

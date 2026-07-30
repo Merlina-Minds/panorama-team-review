@@ -12,11 +12,20 @@ has already matched.
 
 from __future__ import annotations
 
+from typing import get_args
+
 import pytest
 
-from panorama_team_review.model import Rulebase
+from panorama_team_review.model import PolicyScope, Rulebase
 from panorama_team_review.parse import panos
-from panorama_team_review.resolve.evaluation import EvaluationOrder
+from panorama_team_review.resolve.evaluation import (
+    _STAGE_NAMES,
+    STAGE_DEFAULT,
+    STAGE_LOCAL,
+    STAGE_POST,
+    STAGE_PRE,
+    EvaluationOrder,
+)
 
 
 @pytest.fixture
@@ -177,3 +186,21 @@ def test_rulebase_kinds_all_map_to_a_stage(panorama_snapshot):
             update={"location": rule.location.model_copy(update={"rulebase": kind})}
         )
         assert order.scope_of(moved).stage in {"pre", "local", "post", "default"}
+
+
+def test_stage_names_are_exactly_the_ones_the_model_accepts():
+    """The int stages and PolicyScope's Literal must not drift apart.
+
+    ``_STAGE_NAMES`` is the only bridge between the two, and a name that is not
+    in the Literal reaches the model as a validation error at report time --
+    long after the run has done its work. Pinning both directions catches a
+    stage added on one side and forgotten on the other.
+    """
+    allowed = set(get_args(PolicyScope.model_fields["stage"].annotation))
+
+    assert set(_STAGE_NAMES.values()) == allowed
+    assert set(_STAGE_NAMES) == {STAGE_PRE, STAGE_LOCAL, STAGE_POST, STAGE_DEFAULT}
+
+    for stage, name in _STAGE_NAMES.items():
+        scope = PolicyScope(id=f"s{stage}", title="t", stage=name, applies_to="a", position=0)
+        assert scope.stage == name

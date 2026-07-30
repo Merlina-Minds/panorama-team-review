@@ -32,7 +32,7 @@ from ..model import (
 )
 from ..resolve.evaluation import EvaluationOrder
 from ..resolve.inventory import inventory_warnings
-from ..resolve.nettrie import NetworkTrie
+from ..resolve.nettrie import NetworkTrie, contains
 from ..resolve.objects import resolve_named_objects, resolve_snapshot
 from ..resolve.ownership import Attribution, OwnershipResolver
 
@@ -224,7 +224,7 @@ def _objects_by_team(
             here = {
                 team_id
                 for asset, team_id in trie.find_overlaps(net)
-                if net.version == asset.version and net.subnet_of(asset)
+                if contains(asset, net)
             }
             covering = here if covering is None else covering & here
             if not covering:
