@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Reports are rendered in parallel.** Turning the analysed estate into files
+  is CPU-bound and, on a large estate, is the bulk of a run — every team's
+  HTML, Excel, PDF and JSON, plus the cross-team overview, is an independent
+  file. They are now spread across worker processes instead of written one at a
+  time. The new `output.render_workers` sets the count: `0` (default) auto-picks
+  one per CPU, capped; a run of only a handful of files stays sequential; `1`
+  forces sequential rendering. Each worker keeps its own copy of the estate, so
+  raise a fixed value only if there is memory to spare.
 - **Live progress on a terminal during the network steps.** `run`,
   `collect-hitcounts` and `fetch-backup` now print per-device status (to stderr)
   while fetching configs and hit counts, so an interactive run is no longer
@@ -42,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The Excel writer no longer re-parses the same networks millions of times.**
+  Matching a team's assets against a rule's members parsed every CIDR string
+  afresh for each comparison, and estate-wide rules repeat across every team, so
+  the combined workbook spent almost all its time re-parsing identical strings.
+  Parsing each once turns that into a lookup: the cross-team workbook on the
+  estate this was measured on dropped from about three minutes to well under
+  one, and the same matching in the HTML and PDF reports sped up with it. This
+  also makes the empty combined workbook far less likely — it was a run
+  interrupted mid-write, not a broken file.
 - **Panorama hit counts are now collected from the managed firewalls, not from
   Panorama.** Panorama holds no rule hit counters of its own, so the previous
   query returned zeros. Each connected firewall is now queried through Panorama

@@ -38,8 +38,8 @@ from .errors import (
 from .model import OutputFormat, ReportBundle, Snapshot, TeamReport
 from .parse import panos
 from .parse.loader import find_backups, load
+from .report import batch, pdf
 from .report import build as report_build
-from .report import excel, html, json_report, pdf
 from .resolve.inventory import load_inventory
 
 EXIT_OK = 0
@@ -283,7 +283,6 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
         directory = directory / bundle.generated_at.strftime(config.output.timestamped_subdir_format)
     directory.mkdir(parents=True, exist_ok=True)
 
-    written: list[Path] = []
     stamp = bundle.generated_at.strftime("%Y-%m-%d")
     formats = set(config.output.formats)
 
@@ -301,38 +300,43 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
             + ", ".join(report.team.id for report in per_team)
         )
 
+    # Every output file is one job: (team index or COMBINED, format, path). They
+    # are handed to the batch writer, which renders them across worker processes
+    # when the volume justifies it. Heavy formats and the combined document come
+    # first so they start on the first free workers instead of tailing the run,
+    # and the file extension matches the format name.
+    active = [fmt for fmt in ("xlsx", "pdf", "html", "json") if fmt in formats]
+    position = {id(report): index for index, report in enumerate(bundle.teams)}
+    jobs: list[batch.Job] = []
+
+    if config.output.combined:
+        stem = config.output.combined_filename_template.format(date=stamp)
+        for fmt in active:
+            jobs.append((batch.COMBINED, fmt, directory / f"{stem}.{fmt}"))
+
     if config.output.per_team:
         for report in per_team:
             stem = config.output.filename_template.format(
                 date=stamp, team_id=_safe(report.team.id), team_name=_safe(report.team.name)
             )
-            if "html" in formats:
-                written.append(html.write_team(bundle, report, directory / f"{stem}.html", config))
-            if "xlsx" in formats:
-                written.append(
-                    excel.write_team_workbook(bundle, report, directory / f"{stem}.xlsx", config)
-                )
-            if "pdf" in formats:
-                written.append(pdf.write_team(bundle, report, directory / f"{stem}.pdf", config))
-            if "json" in formats:
-                written.append(
-                    json_report.write_team(bundle, report, directory / f"{stem}.json")
-                )
+            for fmt in active:
+                jobs.append((position[id(report)], fmt, directory / f"{stem}.{fmt}"))
 
-    if config.output.combined:
-        stem = config.output.combined_filename_template.format(date=stamp)
-        if "html" in formats:
-            written.append(html.write_combined(bundle, directory / f"{stem}.html", config))
-        if "xlsx" in formats:
-            written.append(
-                excel.write_combined_workbook(bundle, directory / f"{stem}.xlsx", config)
-            )
-        if "pdf" in formats:
-            written.append(pdf.write_combined(bundle, directory / f"{stem}.pdf", config))
-        if "json" in formats:
-            written.append(json_report.write_bundle(bundle, directory / f"{stem}.json"))
+    if not jobs:
+        return []
 
-    return written
+    workers = batch.resolve_worker_count(config.output.render_workers, len(jobs))
+    ctx.step(
+        f"Rendering {len(jobs)} file(s) across {workers} workers"
+        if workers > 1
+        else f"Rendering {len(jobs)} file(s)"
+    )
+
+    def report_progress(done: int, count: int) -> None:
+        if done == count or done % 25 == 0:
+            ctx.step(f"  rendered {done}/{count} file(s)")
+
+    return batch.write_all(bundle, jobs, config, progress=report_progress)
 
 
 def _sample_teams(reports: list[TeamReport], count: int) -> list[TeamReport]:

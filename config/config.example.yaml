@@ -101,6 +101,13 @@ output:
   # Delete all but the N newest run directories. Unset keeps everything.
   keep_runs: 12
 
+  # Worker processes for rendering the report files. Rendering is CPU-bound and
+  # dominates a large run, so it is spread across processes. 0 auto-picks one
+  # per CPU (capped); a small run stays sequential regardless. Set 1 to disable
+  # parallelism. Each worker keeps its own copy of the estate, so raise a fixed
+  # value only if there is memory to spare.
+  render_workers: 0
+
 
 # ---------------------------------------------------------------------------
 # Who owns what

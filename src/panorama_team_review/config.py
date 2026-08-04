@@ -186,6 +186,14 @@ class OutputConfig(ConfigModel):
     keep_runs: int | None = Field(
         default=None, description="Delete all but the N newest run directories; None keeps all"
     )
+    render_workers: int = Field(
+        default=0,
+        ge=0,
+        description="Worker processes for rendering the report files, which is CPU-bound and "
+        "dominates a large run. 0 means auto (one per CPU, capped); a small run stays "
+        "sequential regardless. 1 disables parallelism. Each worker holds its own copy of the "
+        "analysed estate, so raise this only if there is memory to spare.",
+    )
 
     @field_validator("directory", mode="before")
     @classmethod

@@ -176,6 +176,7 @@ output:
   timestamped_subdir: true
   timestamped_subdir_format: "%Y-%m-%d"
   keep_runs: 12
+  render_workers: 0
 ```
 
 | Key | Default | Meaning |
@@ -188,6 +189,7 @@ output:
 | `timestamped_subdir` | `true` | Write into `<directory>/<run>/` |
 | `timestamped_subdir_format` | `%Y-%m-%d` | strftime format for that run directory |
 | `keep_runs` | unset | Delete all but the N newest run directories |
+| `render_workers` | `0` | Rendering worker processes; `0` auto, `1` sequential |
 
 ### Several runs on the same day
 
@@ -207,6 +209,16 @@ format may not contain a path separator: a run directory is a single level.
 
 `pdf` requires the `[pdf]` extra and its system libraries; `validate` reports
 it as a problem if it is configured but unusable.
+
+### Rendering speed
+
+Turning the analysed estate into files is CPU-bound and, on a large estate with
+`pdf` enabled, is the bulk of a run's wall-clock time. Every output file is
+independent, so they are rendered across worker processes. `render_workers: 0`
+(the default) picks one worker per CPU, capped; a run of only a handful of files
+stays sequential, where a pool would not repay its start-up. Set a fixed number
+to pin it, or `1` to render sequentially. Each worker keeps its own copy of the
+estate in memory, so raise a fixed value only if there is room for it.
 
 PDF rendering also needs at least one installed font. On a minimal host with
 none, WeasyPrint still writes a PDF but warns `No fonts configured in

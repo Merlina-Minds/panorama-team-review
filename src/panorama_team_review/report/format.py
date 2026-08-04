@@ -8,6 +8,7 @@ formatting decisions so downstream consumers get raw values.
 from __future__ import annotations
 
 import ipaddress
+from functools import lru_cache
 from typing import NamedTuple
 
 from ..model import (
@@ -21,6 +22,18 @@ from ..model import (
     Severity,
     TeamReport,
 )
+
+
+@lru_cache(maxsize=None)
+def _network(cidr: str) -> IPNetwork:
+    """Parse a CIDR string, memoised.
+
+    The same few thousand CIDRs recur across tens of thousands of rows -- and
+    every team carries its own copy of each estate-wide rule -- so without this
+    the combined workbook spent almost all its time re-parsing identical
+    strings. One parse each turns that into a dict lookup.
+    """
+    return ipaddress.ip_network(cidr)
 
 DIRECTION_LABELS = {
     "inbound": "Who reaches these networks",
@@ -267,19 +280,26 @@ def asset_cells(view: RuleView, labels: dict[str, str]) -> list[Cell]:
     around a /21 -- that group is what appears, because that is what the rule
     says and what a change request has to argue with.
     """
-    assets = [ipaddress.ip_network(cidr) for cidr in view.matched_assets]
+    assets = [_network(cidr) for cidr in view.matched_assets]
     fields = _own_side(view)
 
     # Sizes here are small: at most a few dozen objects on a side and a few
     # dozen of the team's networks touched by any one rule, so the plain
-    # nested scan costs less than building an index per cell would.
+    # nested scan costs less than building an index per cell would. Member
+    # networks are parsed once per member rather than once per asset, so a
+    # group that resolves to hundreds of networks is not re-parsed for each of
+    # the team's assets.
     grouped: dict[str, tuple[list[str], list[str]]] = {}
     for field in fields:
         for member in field.members:
+            member_networks = [_network(cidr) for cidr in member.networks]
             covered = [
                 str(asset)
                 for asset in assets
-                if any(_overlaps(network, asset) for network in member.networks)
+                if any(
+                    network.version == asset.version and network.overlaps(asset)
+                    for network in member_networks
+                )
             ]
             if not covered:
                 continue
@@ -313,11 +333,6 @@ def _own_detail(covered: list[str], networks: list[str]) -> str:
             "Resolves to " + _truncate_list(networks, 20),
         ]
     )
-
-
-def _overlaps(cidr: str, asset: IPNetwork) -> bool:
-    network = ipaddress.ip_network(cidr)
-    return network.version == asset.version and network.overlaps(asset)
 
 
 def peer_team_cell(view: RuleView, limit: int = 3) -> Cell | None:
