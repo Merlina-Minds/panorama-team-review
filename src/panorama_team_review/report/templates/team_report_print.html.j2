@@ -144,7 +144,7 @@
 </section>
 {% endif %}
 
-{% macro rule_table(groups, title, lede, count, show_findings=true, show_direction=false) %}
+{% macro rule_table(groups, title, lede, count, show_findings=true, show_direction=false, peers_first=false) %}
 <section>
   <h2>{{ title }} ({{ count }})</h2>
   <p class="lede">{{ lede }}</p>
@@ -157,12 +157,16 @@
     {%- if show_findings %}{% set widths = [4, 18, 14, 22, 13, 9, 8, 12] %}
     {%- elif show_direction %}{% set widths = [4, 9, 19, 16, 26, 16, 10] %}
     {%- else %}{% set widths = [4, 21, 18, 28, 18, 11] %}{% endif %}
+    {#- Inbound reads far-side-first, so the wider "other side" width leads too. -#}
+    {%- if peers_first %}{% set i = 2 + (1 if show_direction else 0) %}
+    {%- set widths = widths[:i] + [widths[i + 1], widths[i]] + widths[i + 2:] %}{% endif %}
     <colgroup>{% for width in widths %}<col style="width:{{ width }}%">{% endfor %}</colgroup>
     <thead>
       <tr>
         <th>Pos</th>
         {% if show_direction %}<th>Direction</th>{% endif %}
-        <th>Rule</th><th>Your networks</th><th>Other side</th>
+        <th>Rule</th>
+        {% if peers_first %}<th>Other side</th><th>Your networks</th>{% else %}<th>Your networks</th><th>Other side</th>{% endif %}
         <th>Service / ports</th><th>Application</th>
         {% if show_findings %}<th>Ticket</th><th>Findings</th>{% endif %}
       </tr>
@@ -183,9 +187,12 @@
         <td>{{ view.rule.name }}{% if view.rule.disabled %}<br><span class="tag">disabled</span>{% endif %}{% if not view.rule.action.permits_traffic %}<br><span class="blocked">⊘ {{ view.rule.action.value }}</span>{% endif %}</td>
         {#- Names, not addresses: a printed page has no tooltip, so the object
             name is all there is room for -- and it is the part a reader can
-            act on. The addresses stay in the interactive report and the JSON. -#}
-        <td>{{ view | asset_names(report.team.asset_labels) }}</td>
-        <td>{{ view | peer_names }}</td>
+            act on. The addresses stay in the interactive report and the JSON.
+            The two columns swap for inbound so the row reads in the direction
+            the traffic travels, as it does in the HTML report. -#}
+        {% set own_cell %}<td>{{ view | asset_names(report.team.asset_labels) }}</td>{% endset %}
+        {% set peer_cell %}<td>{{ view | peer_names }}</td>{% endset %}
+        {{ peer_cell if peers_first else own_cell }}{{ own_cell if peers_first else peer_cell }}
         <td class="mono">{{ view.rule.services | services_text(8) }}</td>
         <td>{{ view.rule.applications | join(", ") if view.rule.applications != ["any"] else "any" }}</td>
         {% if show_findings %}
@@ -211,7 +218,8 @@
 </section>
 
 {{ rule_table(own_inbound | group_by_scope(bundle.scopes), "Inbound — who reaches your networks",
-   "Traffic from elsewhere that is permitted to reach the networks you own.", own_inbound | length) }}
+   "Traffic from elsewhere that is permitted to reach the networks you own.", own_inbound | length,
+   peers_first=true) }}
 
 {{ rule_table(own_outbound | group_by_scope(bundle.scopes), "Outbound — what your networks reach",
    "Traffic your systems are permitted to send to other networks.", own_outbound | length) }}
@@ -238,7 +246,7 @@
 {{ rule_table(cov_inbound | group_by_scope(bundle.scopes),
    "Inbound — who may already reach your networks",
    "Central rules that let other systems reach yours. Exposure you did not request, which is
-    exactly why it is worth reading.", cov_inbound | length, false) }}
+    exactly why it is worth reading.", cov_inbound | length, false, peers_first=true) }}
 {% endif %}
 
 {% if cov_outbound %}

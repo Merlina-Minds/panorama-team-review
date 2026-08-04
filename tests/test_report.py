@@ -547,6 +547,17 @@ def test_excel_workbook_has_the_expected_sheets(bundle, config, tmp_path):
         assert sheet in workbook
 
 
+def test_excel_inbound_columns_lead_with_the_far_side():
+    """Inbound rows read far-side-first, the same logical order as the HTML report."""
+    default = [name for name, _ in excel._rule_columns(peers_first=False)]
+    inbound = [name for name, _ in excel._rule_columns(peers_first=True)]
+    assert default.index("Your networks") < default.index("Peer (other side)")
+    assert inbound.index("Peer (other side)") < inbound.index("Your networks")
+    # Only the own/peer block moves; every other column, Usage included, stays.
+    assert default[: excel._OWN_BLOCK] == inbound[: excel._OWN_BLOCK]
+    assert default[excel._OWN_BLOCK + 4 :] == inbound[excel._OWN_BLOCK + 4 :]
+
+
 def test_excel_combined_workbook_is_written(bundle, config, tmp_path):
     path = excel.write_combined_workbook(bundle, tmp_path / "all.xlsx", config)
     assert path.stat().st_size > 5000
@@ -590,6 +601,15 @@ def test_pdf_print_stylesheet_is_not_escaped(bundle, config):
     content = pdf.render_team_html(bundle, bundle.teams[0], config)
     assert "&#34;" not in content
     assert 'counter(page)' in content
+
+
+def test_pdf_inbound_table_leads_with_the_far_side(bundle, config):
+    """Inbound rows read far-side-first, the same logical order as the HTML report."""
+    report = next((r for r in bundle.teams if r.own("inbound")), None)
+    assert report is not None, "the fixture needs a team with inbound rules"
+    content = pdf.render_team_html(bundle, report, config)
+    inbound = content.split("Inbound — who reaches your networks", 1)[1].split("Outbound —", 1)[0]
+    assert inbound.index("Other side") < inbound.index("Your networks")
 
 
 @pytest.mark.needs_pdf

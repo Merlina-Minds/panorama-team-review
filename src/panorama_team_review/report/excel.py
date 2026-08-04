@@ -68,6 +68,21 @@ _RULE_COLUMNS: list[tuple[str, int]] = [
 # per-firewall breakdown as a cell comment (a workbook has no tooltip).
 _USAGE_INDEX = next(i for i, (name, _) in enumerate(_RULE_COLUMNS) if name == "Usage")
 
+# Start of the four-column own/peer block. On the inbound sheets these swap so
+# the row reads in the direction the traffic travels -- far side first -- the
+# same logical order the HTML report uses. The swap stays inside the block, so
+# it moves no other column (Usage included).
+_OWN_BLOCK = next(i for i, (name, _) in enumerate(_RULE_COLUMNS) if name == "Your networks")
+
+
+def _rule_columns(peers_first: bool = False) -> list[tuple[str, int]]:
+    """The rule-sheet columns, with the own/peer pair ordered by direction."""
+    if not peers_first:
+        return _RULE_COLUMNS
+    cols = list(_RULE_COLUMNS)
+    cols[_OWN_BLOCK:_OWN_BLOCK + 4] = cols[_OWN_BLOCK + 2:_OWN_BLOCK + 4] + cols[_OWN_BLOCK:_OWN_BLOCK + 2]
+    return cols
+
 
 class _Formats:
     """Cell formats, created once per workbook."""
@@ -128,7 +143,8 @@ def write_team_workbook(
         views = report.own(direction)
         if views or direction in ("inbound", "outbound"):
             _write_rule_sheet(
-                book, formats, title, views, config, bundle, labels=report.team.asset_labels
+                book, formats, title, views, config, bundle,
+                labels=report.team.asset_labels, peers_first=direction == "inbound",
             )
 
     # Split by direction here too: "who may reach me" and "what may my systems
@@ -144,6 +160,7 @@ def write_team_workbook(
             _write_rule_sheet(
                 book, formats, title, views, config, bundle,
                 decisions=False, labels=report.team.asset_labels,
+                peers_first=direction == "inbound",
             )
 
     other = report.covered("internal") + report.covered("related")
@@ -352,15 +369,16 @@ def _write_rule_sheet(
     bundle: ReportBundle,
     decisions: bool = True,
     labels: dict[str, str] | None = None,
+    peers_first: bool = False,
 ) -> None:
     sheet = book.add_worksheet(_safe_sheet_name(title))
-    _setup_rule_sheet(sheet, formats, _RULE_COLUMNS, len(views))
+    _setup_rule_sheet(sheet, formats, _rule_columns(peers_first), len(views))
     scopes = {scope.id: scope for scope in bundle.scopes}
 
     for index, view in enumerate(views, start=1):
         _write_rule_row(
             sheet, formats, index, view, config,
-            team_name=None, scopes=scopes, report_labels=labels,
+            team_name=None, scopes=scopes, report_labels=labels, peers_first=peers_first,
         )
 
     if decisions:
@@ -405,6 +423,7 @@ def _write_rule_row(
     team_name: str | None,
     scopes: dict[str, Any] | None = None,
     report_labels: dict[str, str] | None = None,
+    peers_first: bool = False,
 ) -> None:
     rule = view.rule
     base = formats.disabled if rule.disabled else formats.cell
@@ -421,6 +440,21 @@ def _write_rule_row(
     scope = (scopes or {}).get(view.scope_id)
     block = f"{scope.position + 1}. {scope.title}" if scope else view.scope_id
 
+    # Name first, addresses beside it. A workbook has no tooltip, and the name is
+    # the string a change request has to cite -- but the addresses still have to
+    # be there, because that is what somebody checks the rule against. The two
+    # sides swap on the inbound sheets so the row reads in the direction the
+    # traffic travels, as it does in the HTML report.
+    own_block = [
+        (fmt.asset_names(view, report_labels, limit), base),
+        (fmt.assets_text(view, limit), base),
+    ]
+    peer_block = [
+        (fmt.peer_names(view, limit), base),
+        (fmt.peers_text(view, limit), base),
+    ]
+    address_block = peer_block + own_block if peers_first else own_block + peer_block
+
     values.extend(
         [
             ("", formats.input),  # Decision -- filled in by the owner
@@ -431,14 +465,7 @@ def _write_rule_row(
             (rule.name, base),
             (rule.location.label(), base),
             (fmt.rule_status(rule), base),
-            # Name first, addresses beside it. A workbook has no tooltip, and
-            # the name is the string a change request has to cite -- but the
-            # addresses still have to be there, because that is what somebody
-            # checks the rule against.
-            (fmt.asset_names(view, report_labels, limit), base),
-            (fmt.assets_text(view, limit), base),
-            (fmt.peer_names(view, limit), base),
-            (fmt.peers_text(view, limit), base),
+            *address_block,
             (", ".join(view.peer_teams), base),
             (fmt.object_names(rule.source), base),
             (fmt.object_names(rule.destination), base),

@@ -68,6 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The PDF and Excel reports now order the address columns by direction, like
+  the HTML report.** On the inbound sheets and tables the far side comes before
+  a team's own networks, so every row reads left to right in the direction the
+  traffic travels ("who reaches you → your networks"); outbound keeps the team's
+  own side first. The HTML report already did this; the other two had kept a
+  fixed order.
 - **Shared rules no longer show "not collected" when they have hits.** A shared
   pre/post rule is pushed to every managed firewall, so its counters arrive
   keyed by each firewall's serial rather than by any device group -- and the

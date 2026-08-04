@@ -5,14 +5,14 @@
       "example-estate.xml"
     ],
     "source_type": "panorama",
-    "file_mtime": "2026-08-04T22:41:04.400182",
-    "parsed_at": "2026-08-04T22:41:05.764384",
+    "file_mtime": "2026-08-05T00:22:58.774969",
+    "parsed_at": "2026-08-05T00:23:00.183872",
     "pan_os_version": "11.1.0",
     "hostname": "panorama.example.com",
     "tool_version": "0.1.0",
     "config_hash": "36184e5eb65b9931d22fc0f1f1b8a99e2765e85e8b3b009df8fb94a73e248e30"
   },
-  "generated_at": "2026-08-04T22:41:05.825758",
+  "generated_at": "2026-08-05T00:23:00.233799",
   "hitcount_available": false,
   "team": {
     "team": {
@@ -1183,7 +1183,7 @@
             "rule_name": "development-pre-08",
             "rule_uuid": "4795b77d-3cc0-0154-53e1-8053f1476421",
             "location": "DG-Development/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 53 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "development"
@@ -1678,7 +1678,7 @@
             "rule_name": "development-pre-11",
             "rule_uuid": "bf5f3088-16fb-d8d3-a41a-45cf222af20e",
             "location": "DG-Development/pre",
-            "detail": "The stated expiry is 2026-08-27, in 23 days.",
+            "detail": "The stated expiry is 2026-08-27, in 22 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "development"
@@ -1989,7 +1989,7 @@
             "rule_name": "development-pre-16",
             "rule_uuid": "8065412e-5053-2590-95ba-2e5684d8ab57",
             "location": "DG-Development/pre",
-            "detail": "The stated expiry is 2026-08-27, in 23 days.",
+            "detail": "The stated expiry is 2026-08-27, in 22 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "development"
@@ -2157,7 +2157,7 @@
             "rule_name": "development-pre-19",
             "rule_uuid": "c2fbe9ac-020b-4d1c-1770-116d4b7b80ea",
             "location": "DG-Development/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 53 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "development"
@@ -2465,7 +2465,7 @@
             "rule_name": "development-pre-01",
             "rule_uuid": "e71afba8-8884-e186-61de-d174fce12fc3",
             "location": "DG-Development/pre",
-            "detail": "The stated expiry is 2026-08-27, in 23 days.",
+            "detail": "The stated expiry is 2026-08-27, in 22 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "development"
@@ -2633,7 +2633,7 @@
             "rule_name": "development-pre-06",
             "rule_uuid": "f7ef261f-0c56-e26d-b775-89fa76002b4f",
             "location": "DG-Development/pre",
-            "detail": "The stated expiry is 2026-08-27, in 23 days.",
+            "detail": "The stated expiry is 2026-08-27, in 22 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "development"
@@ -3384,7 +3384,7 @@
             "rule_name": "development-post-01",
             "rule_uuid": "0895ea7b-ba78-87e7-2c7f-fb78bd5a1184",
             "location": "DG-Development/post",
-            "detail": "The stated expiry is 2026-08-27, in 23 days.",
+            "detail": "The stated expiry is 2026-08-27, in 22 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "development"
@@ -4493,7 +4493,7 @@
         "rule_name": "development-pre-08",
         "rule_uuid": "4795b77d-3cc0-0154-53e1-8053f1476421",
         "location": "DG-Development/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 53 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "development"
@@ -4506,7 +4506,7 @@
         "rule_name": "development-pre-19",
         "rule_uuid": "c2fbe9ac-020b-4d1c-1770-116d4b7b80ea",
         "location": "DG-Development/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 53 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "development"
@@ -4610,7 +4610,7 @@
         "rule_name": "development-post-01",
         "rule_uuid": "0895ea7b-ba78-87e7-2c7f-fb78bd5a1184",
         "location": "DG-Development/post",
-        "detail": "The stated expiry is 2026-08-27, in 23 days.",
+        "detail": "The stated expiry is 2026-08-27, in 22 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "development"
@@ -4623,7 +4623,7 @@
         "rule_name": "development-pre-01",
         "rule_uuid": "e71afba8-8884-e186-61de-d174fce12fc3",
         "location": "DG-Development/pre",
-        "detail": "The stated expiry is 2026-08-27, in 23 days.",
+        "detail": "The stated expiry is 2026-08-27, in 22 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "development"
@@ -4649,7 +4649,7 @@
         "rule_name": "development-pre-06",
         "rule_uuid": "f7ef261f-0c56-e26d-b775-89fa76002b4f",
         "location": "DG-Development/pre",
-        "detail": "The stated expiry is 2026-08-27, in 23 days.",
+        "detail": "The stated expiry is 2026-08-27, in 22 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "development"
@@ -4675,7 +4675,7 @@
         "rule_name": "development-pre-11",
         "rule_uuid": "bf5f3088-16fb-d8d3-a41a-45cf222af20e",
         "location": "DG-Development/pre",
-        "detail": "The stated expiry is 2026-08-27, in 23 days.",
+        "detail": "The stated expiry is 2026-08-27, in 22 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "development"
@@ -4701,7 +4701,7 @@
         "rule_name": "development-pre-16",
         "rule_uuid": "8065412e-5053-2590-95ba-2e5684d8ab57",
         "location": "DG-Development/pre",
-        "detail": "The stated expiry is 2026-08-27, in 23 days.",
+        "detail": "The stated expiry is 2026-08-27, in 22 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "development"
