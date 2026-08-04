@@ -28,7 +28,7 @@ import click
 
 from . import __version__
 from .analyze.findings import available_checks
-from .config import Config, load_config
+from .config import Config, ConnectionConfig, load_config
 from .errors import (
     BackupNotFoundError,
     BackupStaleError,
@@ -54,6 +54,9 @@ class Context:
         self.config_path = config_path
         self.quiet = quiet
         self.verbose = verbose
+        # A terminal gets live progress during the slow network steps; cron (no
+        # TTY) stays quiet and just gets the summary lines, as before.
+        self.interactive = sys.stderr.isatty() and not quiet
 
     def say(self, message: str) -> None:
         if not self.quiet:
@@ -65,6 +68,11 @@ class Context:
 
     def warn(self, message: str) -> None:
         click.echo(f"warning: {message}", err=True)
+
+    def step(self, message: str) -> None:
+        """Transient progress shown only in a terminal, so cron output is unchanged."""
+        if self.interactive:
+            click.echo(message, err=True)
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -241,7 +249,7 @@ def _fetch_backups(ctx: Context, no_network: bool) -> None:
 
     try:
         written, notes = fetch.fetch_backups(
-            config.input.fetch, config.hitcounts, config.input.backup_dir
+            config.input.fetch, config.hitcounts, config.input.backup_dir, progress=ctx.step
         )
     except PanReviewError as exc:
         ctx.warn(f"configuration fetch failed, using existing backups: {exc}")
@@ -262,7 +270,7 @@ def _enrich(ctx: Context, snapshot: Snapshot, no_network: bool) -> list[str]:
 
     from .enrich import hitcount
 
-    notes = hitcount.enrich_snapshot(snapshot, config, offline_only=no_network)
+    notes = hitcount.enrich_snapshot(snapshot, config, offline_only=no_network, progress=ctx.step)
     for note in notes:
         ctx.detail(note)
     return notes
@@ -272,7 +280,7 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
     config = ctx.config
     directory = config.output.directory
     if config.output.timestamped_subdir:
-        directory = directory / bundle.generated_at.strftime("%Y-%m-%d")
+        directory = directory / bundle.generated_at.strftime(config.output.timestamped_subdir_format)
     directory.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []
@@ -435,22 +443,27 @@ def _prune_old_runs(ctx: Context) -> None:
     if not base.is_dir():
         return
 
+    fmt = ctx.config.output.timestamped_subdir_format
     runs = sorted(
-        (path for path in base.iterdir() if path.is_dir() and _looks_like_run_dir(path.name)),
-        key=lambda p: p.name,
+        (
+            (parsed, path)
+            for path in base.iterdir()
+            if path.is_dir() and (parsed := _run_dir_time(path.name, fmt)) is not None
+        ),
+        key=lambda item: item[0],
         reverse=True,
     )
-    for stale in runs[keep:]:
+    for _, stale in runs[keep:]:
         ctx.detail(f"removing old run directory {stale}")
         shutil.rmtree(stale, ignore_errors=True)
 
 
-def _looks_like_run_dir(name: str) -> bool:
+def _run_dir_time(name: str, fmt: str) -> datetime | None:
+    """The run time encoded in a directory name, or ``None`` if it is not one."""
     try:
-        datetime.strptime(name, "%Y-%m-%d")
+        return datetime.strptime(name, fmt)
     except ValueError:
-        return False
-    return True
+        return None
 
 
 def _safe(value: str) -> str:
@@ -602,6 +615,9 @@ def validate(ctx: Context) -> None:
     else:
         click.echo("Config fetch:  disabled (backups read from disk)")
 
+    if config.hitcounts.enabled or config.input.fetch.enabled:
+        _check_connection(config.hitcounts, problems)
+
     click.echo(f"Output:        {config.output.directory}, formats: {', '.join(config.output.formats)}")
 
     if problems:
@@ -610,6 +626,36 @@ def validate(ctx: Context) -> None:
             click.echo(f"  - {problem}", err=True)
         sys.exit(EXIT_CONFIG)
     click.echo("\nConfiguration is valid.")
+
+
+def _check_connection(conn: ConnectionConfig, problems: list[str]) -> None:
+    """Report the credential method and flag any configured file that is missing.
+
+    Environment variables are deliberately not checked: the recommended pattern
+    supplies the secret only at run time, so an unset variable during an
+    interactive validate is not an error. A file named in the config that does
+    not exist always is.
+    """
+    if conn.api_key_file is not None:
+        method = f"API key from file {conn.api_key_file}"
+    elif conn.username:
+        source = conn.password_file or f"${conn.password_env}"
+        method = f"username {conn.username!r} with password from {source}"
+    else:
+        method = f"API key from ${conn.api_key_env} (must be set at run time)"
+    click.echo(f"Credentials:   {method}")
+
+    for label, path_value, allow_empty in (
+        ("hitcounts.api_key_file", conn.api_key_file, False),
+        ("hitcounts.password_file", conn.password_file, False),
+        ("hitcounts.ca_bundle", conn.ca_bundle, True),
+    ):
+        if path_value is None:
+            continue
+        if not path_value.is_file():
+            problems.append(f"{label} does not exist: {path_value}")
+        elif not allow_empty and path_value.stat().st_size == 0:
+            problems.append(f"{label} is empty: {path_value}")
 
 
 # ---------------------------------------------------------------------------
@@ -689,7 +735,7 @@ def collect_hitcounts(ctx: Context) -> None:
     from .enrich import hitcount
 
     try:
-        counters = hitcount.collect(config)
+        counters = hitcount.collect(config, progress=ctx.step)
         hitcount._write_cache(config, counters)
     except PanReviewError as exc:
         click.echo(f"error: {exc}", err=True)
@@ -728,7 +774,7 @@ def fetch_backup(ctx: Context) -> None:
 
     try:
         written, notes = fetch.fetch_backups(
-            config.input.fetch, config.hitcounts, config.input.backup_dir
+            config.input.fetch, config.hitcounts, config.input.backup_dir, progress=ctx.step
         )
     except PanReviewError as exc:
         click.echo(f"error: {exc}", err=True)
@@ -737,6 +783,56 @@ def fetch_backup(ctx: Context) -> None:
     for note in notes:
         ctx.detail(note)
     click.echo(f"fetched {len(written)} configuration(s) into {config.input.backup_dir}")
+
+
+@main.command("fetch-cert")
+@click.argument("devices", nargs=-1)
+@click.option(
+    "-o", "--output", type=click.Path(dir_okay=False, path_type=Path),
+    help="Write the certificate bundle here. Defaults to panorama-ca.pem.",
+)
+@click.pass_obj
+def fetch_cert(ctx: Context, devices: tuple[str, ...], output: Path | None) -> None:
+    """Fetch the TLS certificate(s) from the device(s) into a CA bundle.
+
+    For a device with a self-signed or internal-CA certificate, this is the
+    secure alternative to turning verification off: point `hitcounts.ca_bundle`
+    at the written file and the connection is verified against a pinned
+    certificate.
+
+    Trust on first use -- the certificate is fetched without verification, so
+    check the printed SHA-256 fingerprint against the device before trusting it.
+    DEVICES defaults to the hosts in `hitcounts.devices`.
+    """
+    targets = list(devices) or ctx.config.hitcounts.devices
+    if not targets:
+        click.echo(
+            "error: no devices given and hitcounts.devices is empty -- pass one or more "
+            "hostnames, or list them in the configuration.",
+            err=True,
+        )
+        sys.exit(EXIT_CONFIG)
+
+    from . import panos_api
+
+    out_path = output or Path("panorama-ca.pem")
+    pems: list[str] = []
+    for target in targets:
+        host, _, port = target.partition(":")
+        try:
+            pem, fingerprint = panos_api.fetch_certificate(
+                host, int(port) if port else 443, ctx.config.hitcounts.timeout_seconds
+            )
+        except PanReviewError as exc:
+            click.echo(f"error: {exc}", err=True)
+            sys.exit(EXIT_ERROR)
+        pems.append(pem if pem.endswith("\n") else pem + "\n")
+        click.echo(f"{host}: SHA-256 {fingerprint}")
+
+    out_path.write_text("".join(pems), encoding="utf-8")
+    click.echo(f"\nWrote {len(pems)} certificate(s) to {out_path}")
+    click.echo("Verify the fingerprint(s) above against the device, then set in the config:")
+    click.echo(f"  hitcounts:\n    ca_bundle: {out_path}")
 
 
 @main.command("suggest-inventory")

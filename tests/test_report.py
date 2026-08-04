@@ -11,6 +11,7 @@ import pytest
 from panorama_team_review.config import Config, OutputConfig, ReportConfig
 from panorama_team_review.model import AddressMember, ResolvedAddresses
 from panorama_team_review.report import excel, html, json_report, pdf
+from panorama_team_review.report import format as fmt
 from panorama_team_review.report.build import build_report
 
 TODAY = date(2026, 7, 28)
@@ -29,6 +30,59 @@ def bundle(panorama_snapshot, teams, config):
 def test_every_team_gets_a_report(bundle, teams):
     """Even a team with no rules: 'nothing touches your systems' is an answer."""
     assert {report.team.id for report in bundle.teams} == {team.id for team in teams}
+
+
+def test_hit_devices_lists_each_firewall_newest_first():
+    from datetime import datetime
+
+    from panorama_team_review.model import DeviceHit, HitCount, Location, SecurityRule
+
+    rule = SecurityRule(name="r", location=Location(source="t", device_group="DG"))
+    rule.hits = HitCount(
+        hit_count=15,
+        per_device=[
+            DeviceHit(device="fw2", hit_count=5, last_hit=datetime(2026, 7, 20)),
+            DeviceHit(device="fw1", hit_count=10, last_hit=None),
+        ],
+    )
+    text = fmt.hit_devices(rule)
+    assert "fw2: 5 hits, last 2026-07-20" in text
+    assert "fw1: 10 hits, never matched" in text
+
+
+def test_hit_devices_empty_without_a_breakdown():
+    from panorama_team_review.model import Location, SecurityRule
+
+    rule = SecurityRule(name="r", location=Location(source="t"))
+    assert fmt.hit_devices(rule) == ""
+
+
+def test_matched_networks_lead_the_resolved_list():
+    """The network that put the rule in the report reads first, not buried."""
+    from panorama_team_review.report.html import _highlight_networks
+
+    field = ResolvedAddresses(
+        raw=["prod-networks"],
+        networks=["10.10.0.0/16", "10.138.146.0/24", "10.20.0.0/16"],
+    )
+    out = str(_highlight_networks(field, ["10.138.146.0/24"]))
+    assert out.startswith("<strong>10.138.146.0/24</strong>")
+
+
+def test_matched_objects_lead_the_object_list():
+    from panorama_team_review.report.html import _highlight_objects
+
+    field = ResolvedAddresses(
+        raw=["wide", "mine"],
+        members=[
+            AddressMember(name="wide", networks=["10.0.0.0/8"]),
+            AddressMember(name="mine", networks=["10.138.146.0/24"]),
+        ],
+    )
+    out = str(_highlight_objects(field, ["10.138.146.0/24"]))
+    assert out.startswith("<strong>mine</strong>")
+
+
 
 
 def test_rules_are_distributed_by_direction(bundle):

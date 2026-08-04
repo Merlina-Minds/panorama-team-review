@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -177,6 +178,11 @@ class OutputConfig(ConfigModel):
     timestamped_subdir: bool = Field(
         default=True, description="Write into out/<YYYY-MM-DD>/ so cron runs do not overwrite"
     )
+    timestamped_subdir_format: str = Field(
+        default="%Y-%m-%d",
+        description="strftime format for the per-run subdirectory name. Extend it with "
+        "%H-%M-%S to keep several runs on the same day instead of overwriting.",
+    )
     keep_runs: int | None = Field(
         default=None, description="Delete all but the N newest run directories; None keeps all"
     )
@@ -185,6 +191,25 @@ class OutputConfig(ConfigModel):
     @classmethod
     def _expand(cls, v: Any) -> Any:
         return Path(os.path.expandvars(str(v))).expanduser()
+
+    @field_validator("timestamped_subdir_format")
+    @classmethod
+    def _valid_subdir_format(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("output.timestamped_subdir_format must not be empty")
+        if "/" in value or "\\" in value:
+            raise ValueError(
+                "output.timestamped_subdir_format must not contain a path separator -- "
+                "a run directory is a single level"
+            )
+        # No strftime directive means every run resolves to the same name and
+        # overwrites the previous one, which defeats the point of the setting.
+        if datetime(2026, 1, 2, 3, 4, 5).strftime(value) == value:
+            raise ValueError(
+                "output.timestamped_subdir_format has no strftime directive such as %Y-%m-%d; "
+                "as written every run would reuse the same directory"
+            )
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -718,8 +743,14 @@ class ConnectionConfig(ConfigModel):
 
     Shared by every network-facing feature -- hit-count collection and live
     configuration fetch -- so the device list, credentials and TLS policy are
-    stated once.  The API key is never read from this file: it comes from an
-    environment variable or a key file, so the configuration stays shareable.
+    stated once.  Secrets are never read from this file: an API key comes from
+    an environment variable or a key file, and a password the same way, so the
+    configuration stays shareable.
+
+    Authentication is either an API key or a username plus password.  With a
+    username and password the tool obtains an API key from each device itself
+    (a read-only ``keygen`` call), which is the path for a read-only account
+    that was never issued a key.
     """
 
     devices: list[str] = Field(
@@ -731,6 +762,18 @@ class ConnectionConfig(ConfigModel):
     )
     api_key_file: Path | None = Field(
         default=None, description="Alternative to the env var: a file containing only the key"
+    )
+    username: str | None = Field(
+        default=None,
+        description="Username for password authentication. Used only when no API key is "
+        "configured; the tool then obtains a key from each device via keygen.",
+    )
+    password_env: str = Field(
+        default="PAN_PASSWORD",
+        description="Environment variable holding the password. Never read from this file.",
+    )
+    password_file: Path | None = Field(
+        default=None, description="Alternative to the env var: a file containing only the password"
     )
     verify_tls: bool = True
     ca_bundle: Path | None = None
@@ -827,12 +870,27 @@ def load_config(path: Path | None) -> Config:
     # Relative paths in the config are resolved against the config file itself,
     # so a config directory can be moved or mounted elsewhere without edits.
     base = path.parent.resolve()
+
+    def _relative_to_config(value: Path | None) -> Path | None:
+        if value is None:
+            return None
+        expanded = Path(os.path.expandvars(str(value))).expanduser()
+        return expanded if expanded.is_absolute() else base / expanded
+
     if config.teams_file and not config.teams_file.is_absolute():
         config.teams_file = base / config.teams_file
     if config.input.backup_dir and not config.input.backup_dir.is_absolute():
         config.input.backup_dir = base / config.input.backup_dir
     if not config.output.directory.is_absolute():
         config.output.directory = base / config.output.directory
+
+    # Credential, TLS and asset files sit beside the config as naturally as the
+    # backup directory does, so they follow the same rule.
+    config.hitcounts.api_key_file = _relative_to_config(config.hitcounts.api_key_file)
+    config.hitcounts.password_file = _relative_to_config(config.hitcounts.password_file)
+    config.hitcounts.ca_bundle = _relative_to_config(config.hitcounts.ca_bundle)
+    config.hitcounts.cache_dir = _relative_to_config(config.hitcounts.cache_dir)
+    config.report.logo_path = _relative_to_config(config.report.logo_path)
     return config
 
 

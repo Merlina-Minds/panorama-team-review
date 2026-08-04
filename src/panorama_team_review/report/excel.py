@@ -64,6 +64,10 @@ _RULE_COLUMNS: list[tuple[str, int]] = [
     ("Description", 50),
 ]
 
+# Column offset of the Usage cell within _RULE_COLUMNS, for attaching the
+# per-firewall breakdown as a cell comment (a workbook has no tooltip).
+_USAGE_INDEX = next(i for i, (name, _) in enumerate(_RULE_COLUMNS) if name == "Usage")
+
 
 class _Formats:
     """Cell formats, created once per workbook."""
@@ -466,6 +470,13 @@ def _write_rule_row(
             sheet.write_url(
                 row, ticket_column, first_with_url.url, formats.link, fmt.tickets(rule)
             )
+
+    # Per-firewall usage breakdown as a comment on the Usage cell.
+    if rule.hits and rule.hits.per_device:
+        usage_column = (1 if team_name is not None else 0) + _USAGE_INDEX
+        sheet.write_comment(
+            row, usage_column, fmt.hit_devices(rule), {"width": 260, "height": 140}
+        )
 
 
 def _add_decision_validation(sheet, row_count: int, first_data_row: int, column: int) -> None:

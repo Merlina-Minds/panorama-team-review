@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from panorama_team_review.cli import EXIT_CONFIG, EXIT_NO_BACKUP, EXIT_OK, main
-from panorama_team_review.config import OutputConfig
+from panorama_team_review.cli import EXIT_CONFIG, EXIT_NO_BACKUP, EXIT_OK, Context, main
+from panorama_team_review.config import Config, OutputConfig
 
 # What the cross-team overview is called, taken from the configuration rather
 # than repeated here: the name is deliberately distinct so it does not vanish
@@ -312,6 +313,23 @@ def test_run_creates_a_timestamped_directory(runner, estate):
     assert list(subdirs[0].glob("*.json"))
 
 
+def test_run_timestamped_subdir_format_can_include_a_time(runner, estate):
+    """A format with a time keeps several runs on the same day apart."""
+    config = estate / "config.yaml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "timestamped_subdir: false",
+            'timestamped_subdir: true\n  timestamped_subdir_format: "%Y-%m-%d_%H-%M-%S"',
+        ),
+        encoding="utf-8",
+    )
+    result = runner.invoke(main, ["-c", str(config), "run"])
+    assert result.exit_code == EXIT_OK, result.output
+    subdirs = [p for p in (estate / "reports").iterdir() if p.is_dir()]
+    assert len(subdirs) == 1
+    datetime.strptime(subdirs[0].name, "%Y-%m-%d_%H-%M-%S")
+
+
 def test_run_without_teams_warns(runner, tmp_path, panorama_xml):
     backups = tmp_path / "backups"
     backups.mkdir()
@@ -500,13 +518,91 @@ def test_fetch_backup_refuses_when_disabled(runner, estate):
     assert "disabled" in result.output
 
 
-def test_fetch_backup_writes_into_the_backup_directory(runner, estate, panorama_xml, monkeypatch):
+def test_validate_flags_a_missing_credential_file(runner, estate):
+    """A password/key file named in the config but missing is caught offline."""
+    (estate / "config.yaml").write_text(
+        "input:\n"
+        "  backup_dir: ./backups\n"
+        "  fetch:\n"
+        "    enabled: true\n"
+        "teams_file: inventory.yaml\n"
+        "hitcounts:\n"
+        "  devices: [fw.example.com]\n"
+        "  username: readonly-api\n"
+        "  password_file: ./nope.pass\n"
+        "output:\n"
+        "  directory: ./reports\n"
+        "  formats: [json]\n"
+        "  timestamped_subdir: false\n",
+        encoding="utf-8",
+    )
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "validate"])
+    assert result.exit_code == EXIT_CONFIG
+    assert "password_file does not exist" in result.output
+    assert "Credentials:" in result.output
+
+
+def test_fetch_cert_writes_a_bundle(runner, estate, tmp_path, monkeypatch):
+    from panorama_team_review import panos_api
+
+    monkeypatch.setattr(
+        panos_api,
+        "fetch_certificate",
+        lambda host, port=443, timeout=30: (f"PEM-{host}\n", "AA:BB:CC"),
+    )
+    out = tmp_path / "ca.pem"
+    result = runner.invoke(
+        main,
+        ["-c", str(estate / "config.yaml"), "fetch-cert",
+         "fw1.example.com", "fw2.example.com", "-o", str(out)],
+    )
+    assert result.exit_code == EXIT_OK, result.output
+    assert out.read_text(encoding="utf-8") == "PEM-fw1.example.com\nPEM-fw2.example.com\n"
+    assert "AA:BB:CC" in result.output
+
+
+def test_fetch_cert_needs_devices(runner, estate):
+    """Without hosts and without hitcounts.devices there is nothing to fetch."""
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "fetch-cert"])
+    assert result.exit_code == EXIT_CONFIG
+
+
+def test_progress_is_shown_only_in_a_terminal(capsys):
+    """Cron (no TTY) must stay quiet; a terminal gets live progress on stderr."""
+    ctx = Context(Config(), None, quiet=False, verbose=False)
+    assert ctx.interactive is False  # pytest's captured stderr is not a TTY
+
+    ctx.step("working…")
+    assert "working" not in capsys.readouterr().err
+
+    ctx.interactive = True
+    ctx.step("working…")
+    assert "working" in capsys.readouterr().err
+
+
+def test_quiet_disables_progress_even_in_a_terminal(monkeypatch):
+    class _FakeTTY:
+        def isatty(self):
+            return True
+
+        def write(self, *args):
+            pass
+
+        def flush(self):
+            pass
+
+    monkeypatch.setattr("sys.stderr", _FakeTTY())
+    assert Context(Config(), None, quiet=False, verbose=False).interactive is True
+    assert Context(Config(), None, quiet=True, verbose=False).interactive is False
+
+
+def test_fetch_backup_writes_into_the_backup_directory(runner, estate, firewall_xml, monkeypatch):
     from panorama_team_review import panos_api
 
     monkeypatch.setenv("PAN_API_KEY", "secret")
     monkeypatch.setattr(panos_api, "open_session", lambda conn: object())
     monkeypatch.setattr(
-        panos_api, "export_configuration", lambda *a, **k: panorama_xml.encode("utf-8")
+        panos_api, "export_configuration", lambda *a, **k: firewall_xml.encode("utf-8")
     )
 
     (estate / "config.yaml").write_text(
@@ -530,7 +626,7 @@ def test_fetch_backup_writes_into_the_backup_directory(runner, estate, panorama_
     assert fetched, "the fetched configuration should be written into backup_dir"
 
 
-def test_run_fetches_configuration_when_enabled(runner, estate, panorama_xml, monkeypatch):
+def test_run_fetches_configuration_when_enabled(runner, estate, firewall_xml, monkeypatch):
     from panorama_team_review import panos_api
 
     monkeypatch.setenv("PAN_API_KEY", "secret")
@@ -539,7 +635,7 @@ def test_run_fetches_configuration_when_enabled(runner, estate, panorama_xml, mo
 
     def fake_export(session, device, key, conn):
         captured["device"] = device
-        return panorama_xml.encode("utf-8")
+        return firewall_xml.encode("utf-8")
 
     monkeypatch.setattr(panos_api, "export_configuration", fake_export)
 

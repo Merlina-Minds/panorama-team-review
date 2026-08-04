@@ -42,8 +42,8 @@ of an organisation's network segmentation.
 | Decompression bomb in a `.gz` or `.tgz` | Members capped at 2 GiB, enforced before extraction |
 | Path traversal from archive members | Only in-memory reads; nothing is extracted to disk |
 | Malicious rule names or descriptions reaching a report | Jinja autoescaping on for all data; only the tool's own stylesheets bypass it. Tested in `test_html_escapes_rule_content`. |
-| Unintended device modification | Both network features are read-only: the hit-count module accepts only `show` operational commands (checked before sending), and configuration fetch only ever requests `type=export&category=configuration` |
-| Credential exposure | API keys are read from an environment variable or a key file, never from the configuration file; `config/config.yaml` is gitignored |
+| Unintended device modification | Both network features are read-only: every operational command is checked to start with `show` before it is sent (including the ones Panorama proxies to a managed firewall via `target`), and configuration fetch only ever requests `type=export&category=configuration`. Password authentication uses only a `keygen` credential exchange |
+| Credential exposure | API keys and passwords are read from an environment variable or a file, never from the configuration file; only the username, which is not a secret, may live there. `config/config.yaml` is gitignored |
 | Unintended network access | Network code lives only in `panos_api.py` (shared transport) and its two callers `enrich/hitcount.py` and `fetch.py`, all disabled by default; CI verifies a full run completes with outbound traffic blocked |
 
 ### What it does not protect against
@@ -54,9 +54,12 @@ of an organisation's network segmentation.
 - **Report contents.** Generated reports describe your network segmentation as
   completely as the configuration does. Distributing them is your decision;
   see [docs/PRIVACY.md](docs/PRIVACY.md).
-- **`--verify-tls: false`.** Available because some management networks use
+- **`verify_tls: false`.** Available because some management networks use
   internal CAs that are awkward to distribute, but it defeats the point of TLS
-  on a management interface. Prefer `ca_bundle`.
+  on a management interface. Prefer `ca_bundle` — `pan-review fetch-cert`
+  retrieves a device's certificate and prints its SHA-256 fingerprint so you can
+  verify it out of band before trusting it. That fetch is trust-on-first-use
+  (unverified by necessity), so the fingerprint check matters.
 - **The scrubber is not an anonymiser.** Structure is preserved and the mapping
   is reversible with the salt. See the limits section in
   [docs/PRIVACY.md](docs/PRIVACY.md).
@@ -66,9 +69,9 @@ of an organisation's network segmentation.
 - Run as an unprivileged user with read access to the backup directory and
   write access to the output directory. Nothing else is needed.
 - Keep the network features (hit-count collection and configuration fetch)
-  disabled unless you need them. If you enable either, use an API key bound to a
-  **read-only administrator role**, supplied through the environment or a
-  mode-`0600` key file.
+  disabled unless you need them. If you enable either, use an account bound to a
+  **read-only administrator role**, and supply its secret (API key or password)
+  through the environment or a mode-`0600` file — never in the configuration.
 - Restrict access to the output directory. Reports are as sensitive as the
   configuration they describe.
 - Set `input.max_age_days` so a broken backup job fails loudly rather than

@@ -92,6 +92,12 @@ output:
   # Write into reports/<YYYY-MM-DD>/ so nightly runs do not overwrite each other.
   timestamped_subdir: true
 
+  # strftime format for that per-run subdirectory. The default is one directory
+  # per day; add a time to keep several runs on the same day side by side
+  # instead of overwriting, e.g. "%Y-%m-%d_%H-%M-%S". Use a format that sorts
+  # chronologically so `keep_runs` prunes the right ones.
+  timestamped_subdir_format: "%Y-%m-%d"
+
   # Delete all but the N newest run directories. Unset keeps everything.
   keep_runs: 12
 
@@ -314,9 +320,9 @@ analysis:
 # querying the device. This is disabled by default and issues read-only
 # operational commands only.
 #
-# The connection settings below (devices, api_key_env/api_key_file, verify_tls,
-# ca_bundle, timeout_seconds) are shared with the optional `input.fetch`
-# feature, so the access to the devices is configured once.
+# The connection settings below (devices, credentials, verify_tls, ca_bundle,
+# timeout_seconds) are shared with the optional `input.fetch` feature, so the
+# access to the devices is configured once.
 #
 # Recommended setup: schedule `pan-review collect-hitcounts` once a night to
 # refresh the cache, and keep `pan-review run` fully offline by passing
@@ -329,13 +335,28 @@ hitcounts:
     # - panorama.example.com
     # - fw-edge-01.example.com
 
-  # The API key is read from this environment variable. Keys are never read
-  # from this file, so the configuration stays shareable.
+  # Authentication is either an API key OR a username plus password. Secrets are
+  # never read from this file, so the configuration stays shareable.
+  #
+  # 1) API key -- read from this environment variable:
   api_key_env: PAN_API_KEY
   # Alternatively, a file containing only the key:
   # api_key_file: /etc/panorama-team-review/api.key
+  #
+  # 2) Username + password -- used only when no API key is configured. For a
+  #    read-only account that was never issued a key: the tool obtains one from
+  #    each device via a read-only keygen call. The username may live here (it
+  #    is not a secret); the password is read from an environment variable or a
+  #    file, never from this configuration.
+  # username: readonly-api
+  # password_env: PAN_PASSWORD
+  # password_file: /etc/panorama-team-review/api.pass
 
   verify_tls: true
+  # Management interfaces often use a self-signed or internal-CA certificate,
+  # which fails verification. Point ca_bundle at that certificate rather than
+  # setting verify_tls: false -- the connection stays authenticated. Fetch it
+  # with:  pan-review -c config.yaml fetch-cert
   # ca_bundle: /etc/ssl/certs/internal-ca.pem
   timeout_seconds: 30
 

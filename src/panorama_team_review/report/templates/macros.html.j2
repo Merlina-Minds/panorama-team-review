@@ -70,7 +70,7 @@
   <td>{{ rule.applications | join(", ") if rule.applications != ["any"] else "any" }}</td>
   {% if show_findings %}
   <td>{{ tickets(rule) }}</td>
-  {% if show_usage %}<td class="num">{{ rule | hit_summary }}</td>{% endif %}
+  {% if show_usage %}{% set devices = rule | hit_devices %}<td class="num"{% if devices %} title="{{ devices }}"{% endif %}>{{ rule | hit_summary }}</td>{% endif %}
   <td>
     {%- for finding in view.findings %}{{ severity_badge(finding.severity.value) }} {% endfor -%}
     {%- if not view.findings %}<span class="pill">ok</span>{% endif %}
@@ -171,7 +171,9 @@
 {% if rule.hits and show_findings %}
 <dl class="detail-grid"><div style="grid-column: 1 / -1">
   <dt>Usage</dt>
-  <dd>{{ rule | hit_summary }} &mdash; collected {{ rule.hits.collected_at.strftime("%Y-%m-%d %H:%M") if rule.hits.collected_at }} from {{ rule.hits.source }}</dd>
+  <dd>{{ rule | hit_summary }} &mdash; collected {{ rule.hits.collected_at.strftime("%Y-%m-%d %H:%M") if rule.hits.collected_at }} from {{ rule.hits.source }}
+  {%- set devices = rule | hit_devices %}
+  {%- if devices %}<div class="per-device" style="white-space: pre-line">{{ devices }}</div>{% endif %}</dd>
 </div></dl>
 {% endif %}
 

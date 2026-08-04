@@ -69,9 +69,14 @@ pytest                 # should be green
 PDF tests need the WeasyPrint system libraries; they skip cleanly without them:
 
 ```bash
-apt install libpango-1.0-0 libpangoft2-1.0-0 libcairo2   # Debian/Ubuntu
-dnf install pango cairo                                   # RHEL/Fedora
+apt install libpango-1.0-0 libpangoft2-1.0-0 libcairo2 fonts-dejavu   # Debian/Ubuntu
+dnf install pango cairo dejavu-sans-fonts                             # RHEL/Fedora
 ```
+
+The `fonts-*` package matters for the PDF path: without an installed font,
+WeasyPrint warns `No fonts configured in FontConfig. Expect ugly output.` and
+renders fallback glyphs. Harmless for the tests, but noisy — install a font to
+silence it.
 
 Try a change end to end against a synthetic estate:
 
@@ -174,7 +179,7 @@ areas where a contribution would genuinely reduce risk, worst first:
 | Area | State |
 |---|---|
 | Real configurations | **None.** Everything runs against the generator, which encodes assumptions about what real estates look like |
-| Hit-count API | Fakes only. `_list_vsys` and `_list_device_groups` have never spoken to a device |
+| Hit-count API | Fakes only. `_list_vsys` and `_list_managed_devices` have never spoken to a device |
 | Configuration fetch | Fakes only. The export transport in `panos_api.py` has never spoken to a device |
 | Multi-vsys, template stacks, `dg-meta-data` | Code paths exist, no test case — no sample was available |
 | PDF and Excel content | Verified as "is a PDF" and "has these sheets", not on cell or page content |

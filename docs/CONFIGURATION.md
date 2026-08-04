@@ -155,9 +155,13 @@ back to whatever is already in `backup_dir`, and `max_age_days` still catches a
 directory that has gone stale. `--no-network` skips the fetch entirely. An
 explicit `--backup FILE` is the manual case and never triggers a fetch.
 
-With several devices listed, each writes its own file and `select` decides what
-`run` then does with them — a single Panorama (one file describing the whole
-estate) is the common case; list multiple firewalls together with `select: all`.
+A firewall writes a single `.xml`. A **Panorama** writes a `.tgz` containing the
+Panorama config plus every managed firewall's running config (pulled through
+Panorama by serial), the shape of a scheduled Panorama backup — so the managed
+firewalls' locally configured rules are included, which a plain Panorama config
+export omits. With several *firewalls* listed directly, each writes its own file
+and `select` decides what `run` then does with them; list them together with
+`select: all`.
 
 ## `output` — where reports go
 
@@ -170,6 +174,7 @@ output:
   filename_template: "{date}_{team_id}_firewall-review"
   combined_filename_template: "{date}_00_OVERVIEW_all-teams"
   timestamped_subdir: true
+  timestamped_subdir_format: "%Y-%m-%d"
   keep_runs: 12
 ```
 
@@ -180,11 +185,35 @@ output:
 | `per_team` | `true` | One file per team |
 | `combined` | `true` | Plus one cross-team overview |
 | `filename_template` | see above | Placeholders: `{date}`, `{team_id}`, `{team_name}` |
-| `timestamped_subdir` | `true` | Write into `<directory>/<YYYY-MM-DD>/` |
+| `timestamped_subdir` | `true` | Write into `<directory>/<run>/` |
+| `timestamped_subdir_format` | `%Y-%m-%d` | strftime format for that run directory |
 | `keep_runs` | unset | Delete all but the N newest run directories |
+
+### Several runs on the same day
+
+`timestamped_subdir_format` is the strftime pattern for the per-run directory.
+The default, `%Y-%m-%d`, is one directory per day, so a second run on the same
+day overwrites the first. To keep both, add a time:
+
+```yaml
+output:
+  timestamped_subdir: true
+  timestamped_subdir_format: "%Y-%m-%d_%H-%M-%S"
+```
+
+Use a format that sorts chronologically as text (year first) — `keep_runs`
+prunes by the time parsed out of the name, and a listing reads in order. The
+format may not contain a path separator: a run directory is a single level.
 
 `pdf` requires the `[pdf]` extra and its system libraries; `validate` reports
 it as a problem if it is configured but unusable.
+
+PDF rendering also needs at least one installed font. On a minimal host with
+none, WeasyPrint still writes a PDF but warns `No fonts configured in
+FontConfig. Expect ugly output.` and uses fallback glyphs. Install a font
+package to fix it — `fonts-dejavu` (Debian/Ubuntu) or `dejavu-sans-fonts`
+(RHEL/Fedora); see the [README](../README.md#installation). The warning affects
+only the PDF, never the other formats.
 
 ## `teams_file` and the inventory
 
@@ -639,6 +668,9 @@ hitcounts:
   devices: []
   api_key_env: PAN_API_KEY
   # api_key_file: /etc/panorama-team-review/api.key
+  # username: readonly-api
+  # password_env: PAN_PASSWORD
+  # password_file: /etc/panorama-team-review/api.pass
   verify_tls: true
   # ca_bundle: /etc/ssl/certs/internal-ca.pem
   timeout_seconds: 30
@@ -653,9 +685,89 @@ network (the other is [`input.fetch`](#fetch-pulling-the-configuration-live),
 which reuses the connection settings below). It is disabled by default and
 issues read-only `show` operational commands exclusively.
 
-The API key is read from an environment variable or a key file, never from this
-configuration file, so the configuration stays shareable. Use a key bound to a
-read-only administrator role.
+### Panorama: counters come from the firewalls
+
+Point `devices` at a Panorama and the connection is used as a gateway, not as a
+source of counters — Panorama holds none of its own. The tool lists the
+connected firewalls and runs the hit-count query on each of them *through*
+Panorama (the API `target` parameter, still a read-only `show` command).
+
+A device-group rule is pushed to every firewall in that group (and its child
+groups), so its usage in the report is the **sum** of those firewalls' counters,
+with the most recent match and a per-firewall breakdown — visible as a tooltip
+in HTML and a cell comment in Excel. This is why a rule that is busy on one
+firewall and idle on the four others it was pushed to is not reported as unused.
+
+For the firewalls' *locally* configured rules to appear at all, the backup must
+contain their configs — a scheduled Panorama backup `.tgz` does, and so does a
+live [`input.fetch`](#fetch-pulling-the-configuration-live).
+
+### Authentication: API key or username and password
+
+Authentication is either an API key or a username plus password. **Secrets are
+never read from the configuration file**, so it stays shareable — only the
+username, which is not a secret, may live there.
+
+| Key | Meaning |
+|---|---|
+| `api_key_env` | Environment variable holding an API key (default `PAN_API_KEY`) |
+| `api_key_file` | A file containing only the key, instead of the env var |
+| `username` | Username for password authentication; used only when no API key is configured |
+| `password_env` | Environment variable holding the password (default `PAN_PASSWORD`) |
+| `password_file` | A file containing only the password, instead of the env var |
+
+An API key is used as-is against every device. If no key is configured but a
+username and password are, the tool obtains a key from each device itself with a
+read-only `keygen` call — the path for a read-only account that was only ever
+given a username and password, not an API key:
+
+```cron
+0 2 * * *  PAN_PASSWORD=... pan-review -c config.yaml collect-hitcounts
+```
+
+with `username: readonly-api` in the configuration. Use an account bound to a
+**read-only administrator role** either way.
+
+### TLS and self-signed certificates
+
+Management interfaces frequently present a self-signed certificate or one issued
+by an internal CA, which fails verification with a message like:
+
+```
+SSLError(... CERTIFICATE_VERIFY_FAILED ... self-signed certificate in certificate chain ...)
+```
+
+There are two ways to resolve it, and one is much better than the other:
+
+- **`ca_bundle: /path/to/cert.pem`** — verify against a pinned certificate or
+  your internal CA. This keeps TLS meaningful: the connection is still
+  authenticated, just against a certificate you chose to trust rather than a
+  public root. **Preferred.**
+- **`verify_tls: false`** — turn verification off entirely. This makes the
+  connection vulnerable to interception on a management network, which is
+  exactly where it matters. Use only as a last resort.
+
+To obtain the certificate for `ca_bundle`, use the built-in helper, which
+fetches it and prints its fingerprint:
+
+```bash
+pan-review -c config.yaml fetch-cert
+# or for a host not yet in the config:
+pan-review fetch-cert panorama.example.com -o panorama-ca.pem
+```
+
+```yaml
+hitcounts:
+  ca_bundle: ./panorama-ca.pem
+```
+
+`fetch-cert` connects **without** verification — that is the point, since
+verification is what is failing — so it is *trust on first use*. Check the
+printed SHA-256 fingerprint against the device (in its web UI, or over SSH with
+`show system state | match certificate`) before trusting the file. If the device
+uses a certificate signed by an internal CA rather than a self-signed one,
+prefer obtaining the CA certificate itself from your PKI, so verification keeps
+working across certificate renewals.
 
 Collected counters are cached as sidecar JSON in `cache_dir`. The recommended
 arrangement keeps reporting offline:

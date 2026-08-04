@@ -75,6 +75,31 @@ def test_error_message_names_the_field(tmp_path):
     assert "output.formats" in str(exc.value)
 
 
+def test_timestamped_subdir_format_defaults_to_one_directory_per_day():
+    assert Config().output.timestamped_subdir_format == "%Y-%m-%d"
+
+
+def test_timestamped_subdir_format_accepts_a_time(tmp_path):
+    path = write(
+        tmp_path / "c.yaml",
+        'output:\n  timestamped_subdir_format: "%Y-%m-%d_%H-%M-%S"\n',
+    )
+    assert load_config(path).output.timestamped_subdir_format == "%Y-%m-%d_%H-%M-%S"
+
+
+def test_timestamped_subdir_format_rejects_a_constant(tmp_path):
+    """A format with no directive would make every run reuse one directory."""
+    path = write(tmp_path / "c.yaml", 'output:\n  timestamped_subdir_format: "reports"\n')
+    with pytest.raises(ConfigError, match="strftime directive"):
+        load_config(path)
+
+
+def test_timestamped_subdir_format_rejects_a_path_separator(tmp_path):
+    path = write(tmp_path / "c.yaml", 'output:\n  timestamped_subdir_format: "%Y/%m/%d"\n')
+    with pytest.raises(ConfigError, match="path separator"):
+        load_config(path)
+
+
 def test_relative_paths_resolve_against_the_config_file(tmp_path):
     (tmp_path / "backups").mkdir()
     path = write(
@@ -91,6 +116,26 @@ def test_relative_paths_resolve_against_the_config_file(tmp_path):
 def test_absolute_paths_are_left_alone(tmp_path):
     path = write(tmp_path / "c.yaml", "output:\n  directory: /var/reports\n")
     assert load_config(path).output.directory == Path("/var/reports")
+
+
+def test_credential_and_asset_paths_resolve_against_the_config_file(tmp_path):
+    """A password or key file beside the config is found from any working dir."""
+    path = write(
+        tmp_path / "c.yaml",
+        "hitcounts:\n"
+        "  api_key_file: ./api.key\n"
+        "  password_file: ./api.pass\n"
+        "  ca_bundle: ./ca.pem\n"
+        "  cache_dir: ./cache\n"
+        "report:\n"
+        "  logo_path: ./logo.png\n",
+    )
+    config = load_config(path)
+    assert config.hitcounts.api_key_file == tmp_path / "api.key"
+    assert config.hitcounts.password_file == tmp_path / "api.pass"
+    assert config.hitcounts.ca_bundle == tmp_path / "ca.pem"
+    assert config.hitcounts.cache_dir == tmp_path / "cache"
+    assert config.report.logo_path == tmp_path / "logo.png"
 
 
 def test_environment_variables_are_expanded(tmp_path, monkeypatch):

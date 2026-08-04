@@ -434,7 +434,28 @@ The recommended arrangement keeps reporting offline:
 0 6 * * 1  pan-review -c /etc/ptr/config.yaml -q run --no-network
 ```
 
-Use an API key bound to a read-only administrator role.
+Authentication is either an API key or a username plus password — for a
+read-only account that was only ever given credentials, not a key, the tool
+obtains one from each device itself with a read-only `keygen` call. Either way,
+use an account bound to a **read-only administrator role**, and note that
+secrets are never read from the configuration file:
+
+```yaml
+hitcounts:
+  username: readonly-api       # not a secret; may live in the config
+  password_env: PAN_PASSWORD   # the password never does
+```
+
+If the management interface uses a self-signed or internal-CA certificate,
+verification fails with `CERTIFICATE_VERIFY_FAILED`. Point `hitcounts.ca_bundle`
+at that certificate rather than disabling verification with `verify_tls: false`
+— the connection then stays authenticated. Fetch the certificate with the
+built-in helper, which prints its fingerprint to verify against the device:
+
+```bash
+pan-review -c config.yaml fetch-cert          # writes panorama-ca.pem
+# then set  hitcounts.ca_bundle: ./panorama-ca.pem
+```
 
 ## Fetching the configuration live
 
@@ -471,6 +492,14 @@ stays offline:
 0 6 * * 1  pan-review -c /etc/ptr/config.yaml -q run --no-network
 ```
 
+For a **Panorama**, the fetch writes a `.tgz` holding the Panorama config plus
+every managed firewall's running config (pulled through Panorama), so the
+firewalls' locally configured rules are included — a plain Panorama config
+export omits them. Likewise, hit counts on a Panorama are collected from each
+managed firewall, since Panorama holds none of its own; a device-group rule's
+usage is then the sum across its firewalls, with the per-firewall breakdown in a
+tooltip.
+
 ## Running from cron
 
 `pan-review run` with no arguments takes the newest backup from the configured
@@ -506,6 +535,7 @@ pan-review init [DIR]         Write a commented example configuration.
 pan-review suggest-inventory  Derive a draft inventory from a configuration.
 pan-review collect-hitcounts  Refresh the hit-count cache (network access).
 pan-review fetch-backup       Pull the running configuration from the devices (network access).
+pan-review fetch-cert         Fetch a device's TLS certificate into a CA bundle (network access).
 pan-review scrub SRC DST      Pseudonymise a configuration for a bug report.
 ```
 
@@ -574,17 +604,25 @@ pip install -e '.[pdf,api]'        # adds PDF output and hit-count collection
 pan-review --help
 ```
 
-PDF output uses WeasyPrint, which needs system libraries:
+PDF output uses WeasyPrint, which needs system libraries and at least one
+installed font:
 
 ```bash
 # Debian / Ubuntu
-apt install libpango-1.0-0 libpangoft2-1.0-0 libcairo2
+apt install libpango-1.0-0 libpangoft2-1.0-0 libcairo2 fonts-dejavu
 # RHEL / Fedora
-dnf install pango cairo
+dnf install pango cairo dejavu-sans-fonts
 ```
 
-Without them the other three formats work unchanged, and `pan-review validate`
-tells you PDF is unavailable rather than failing mid-run.
+Without the libraries the other three formats work unchanged, and `pan-review
+validate` tells you PDF is unavailable rather than failing mid-run.
+
+Without any installed **font**, WeasyPrint still produces a PDF but warns
+`No fonts configured in FontConfig. Expect ugly output.` and falls back to
+generic glyphs. This is common on minimal servers and containers. Installing a
+font package (`fonts-dejavu` above, or any other) silences the warning and
+fixes the layout; it affects only the PDF, never the HTML, Excel or JSON
+output.
 
 ## Customer data
 

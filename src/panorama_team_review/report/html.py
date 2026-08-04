@@ -42,6 +42,7 @@ def _environment() -> Environment:
             "object_names": _object_names,
             "addresses_text": _addresses_text,
             "hit_summary": fmt.hit_summary,
+            "hit_devices": fmt.hit_devices,
             "tickets_text": fmt.tickets,
             "search_text": _search_text,
             "group_by_scope": fmt.group_by_scope,
@@ -162,11 +163,19 @@ def _highlight_objects(field: ResolvedAddresses, highlight: list[str], limit: in
         return Markup("any")
 
     wanted = set(highlight)
+
+    def _matched(member) -> bool:
+        return any(cidr in wanted for cidr in member.networks)
+
+    # Matched objects lead, so the one that put this rule in the report is read
+    # first and never falls past the truncation limit.
+    ordered = [m for m in field.members if _matched(m)] + [
+        m for m in field.members if not _matched(m)
+    ]
     parts = []
-    for member in field.members[:limit]:
+    for member in ordered[:limit]:
         text = escape(member.name)
-        matched = any(cidr in wanted for cidr in member.networks)
-        parts.append(Markup("<strong>{}</strong>").format(text) if matched else text)
+        parts.append(Markup("<strong>{}</strong>").format(text) if _matched(member) else text)
 
     if not parts:
         parts = [escape(name) for name in field.raw[:limit]]
@@ -189,8 +198,13 @@ def _highlight_networks(field: ResolvedAddresses, highlight: list[str]) -> Marku
         return Markup("any")
 
     wanted = set(highlight)
+    # The matched networks lead, so the one that put this rule in the report is
+    # read first and is never the entry that falls past the truncation limit.
+    ordered = [c for c in field.networks if c in wanted] + [
+        c for c in field.networks if c not in wanted
+    ]
     parts = []
-    for cidr in field.networks[:60]:
+    for cidr in ordered[:60]:
         text = escape(cidr)
         parts.append(Markup("<strong>{}</strong>").format(text) if cidr in wanted else text)
     for name in field.fqdns[:20]:

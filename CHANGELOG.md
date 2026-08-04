@@ -9,15 +9,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Live progress on a terminal during the network steps.** `run`,
+  `collect-hitcounts` and `fetch-backup` now print per-device status (to stderr)
+  while fetching configs and hit counts, so an interactive run is no longer
+  silent for minutes. Detected by the TTY: cron (no terminal) and `-q` output is
+  unchanged.
+- **`pan-review fetch-cert`** retrieves a device's TLS certificate into a CA
+  bundle and prints its SHA-256 fingerprint. For a management interface with a
+  self-signed or internal-CA certificate, point `hitcounts.ca_bundle` at the
+  result instead of turning verification off with `verify_tls: false` — the
+  connection stays authenticated. The fetch is unverified by necessity (trust on
+  first use), so verify the fingerprint against the device.
+- **Username and password authentication for the network features.** Where a
+  read-only account has only a username and password and was never issued an API
+  key, hit-count collection and configuration fetch now obtain a key from each
+  device themselves with a read-only `keygen` call. Set `username` in the config
+  and supply the password through `password_env`/`password_file`; an explicit
+  API key still takes precedence. Passwords, like keys, are never read from the
+  configuration file.
+- **`output.timestamped_subdir_format`** makes the per-run directory name
+  configurable (strftime, default `%Y-%m-%d`). Extend it with a time, e.g.
+  `%Y-%m-%d_%H-%M-%S`, to keep several runs on the same day instead of
+  overwriting. `keep_runs` prunes by the time parsed out of the name.
 - **Optional live configuration fetch.** With `input.fetch.enabled`, the tool
   pulls each device's running configuration into `backup_dir` before analysing
   it, instead of depending on a scheduled export landing on disk. It reuses the
   `hitcounts` connection (devices, API key, TLS), so the access is configured
   once, and it can be run on its own with the new `pan-review fetch-backup`
-  command to keep reporting offline. Off by default and read-only: only the
-  configuration export endpoint is ever called. During `run` a fetch failure is
-  a warning that falls back to the backups already on disk, with `max_age_days`
-  still guarding against staleness.
+  command to keep reporting offline. Off by default and read-only. During `run`
+  a fetch failure is a warning that falls back to the backups already on disk,
+  with `max_age_days` still guarding against staleness.
+
+### Fixed
+
+- **Panorama hit counts are now collected from the managed firewalls, not from
+  Panorama.** Panorama holds no rule hit counters of its own, so the previous
+  query returned zeros. Each connected firewall is now queried through Panorama
+  (with the `target` parameter), and a device-group rule's usage is the sum of
+  its firewalls' counters, with the most recent match and a per-firewall
+  breakdown kept for the report. A rule pushed to five firewalls but used on one
+  no longer looks unused.
+- **A live Panorama fetch now includes the managed firewalls' local rules.** A
+  Panorama configuration export holds only the Panorama-side config, so rules
+  configured locally on a firewall were missing. The fetch now pulls each
+  managed firewall's running config too and writes everything into one `.tgz`,
+  the shape of a scheduled Panorama backup, which the parser merges into a single
+  view.
+- **Credential, TLS and asset file paths now resolve relative to the config
+  file**, like `backup_dir`, `teams_file` and the output directory already did.
+  A relative `api_key_file`, `password_file`, `ca_bundle`, `cache_dir` or
+  `report.logo_path` was previously looked up relative to the working directory,
+  so it broke as soon as the tool ran from anywhere but the config's directory.
+- **`validate` checks the connection credentials.** With hit-count collection
+  or configuration fetch enabled, it now reports the credential method and
+  flags a configured API-key, password or CA-bundle file that is missing or
+  empty, instead of leaving it to fail at run time. Environment variables are
+  not checked, since the secret is supplied at run time by design.
 
 ### Changed
 

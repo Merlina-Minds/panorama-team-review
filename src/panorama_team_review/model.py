@@ -325,12 +325,27 @@ class RuleMetadata(BaseModel):
         return sum(1 for d in self.dates if d.role == "changed")
 
 
+class DeviceHit(BaseModel):
+    """One firewall's contribution to an aggregated hit count."""
+
+    device: str = Field(description="Firewall hostname, or serial if the hostname is unknown")
+    hit_count: int = 0
+    last_hit: datetime | None = None
+    source: str = ""
+
+
 class HitCount(BaseModel):
     """Runtime counters.
 
     Never present in a configuration backup -- this is populated only by the
     opt-in enrichment module and carries its own provenance so a report can
     state where the numbers came from and how old they are.
+
+    On Panorama the same rule is pushed to several firewalls, each with its own
+    counters. ``hit_count`` and ``last_hit`` are then the aggregate -- the sum
+    of hits and the most recent match across those firewalls -- and
+    ``per_device`` holds the breakdown, so a report can show "used, but only on
+    one of five firewalls".
     """
 
     hit_count: int = 0
@@ -341,10 +356,16 @@ class HitCount(BaseModel):
     rule_modification: datetime | None = None
     collected_at: datetime | None = None
     source: str = Field(default="", description="Provenance, e.g. 'api:fw01.example.com'")
+    per_device: list[DeviceHit] = Field(
+        default_factory=list,
+        description="Per-firewall breakdown when a rule is pushed to several firewalls",
+    )
 
     @property
     def is_unused(self) -> bool:
         return self.hit_count == 0
+
+
 
 
 # ---------------------------------------------------------------------------

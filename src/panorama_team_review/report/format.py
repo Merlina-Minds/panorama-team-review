@@ -108,13 +108,34 @@ def tickets(rule: SecurityRule) -> str:
 
 
 def hit_summary(rule: SecurityRule) -> str:
-    """One-cell summary of a rule's usage, or why usage is unknown."""
+    """One-cell summary of a rule's usage, or why usage is unknown.
+
+    On Panorama this is the aggregate across the firewalls the rule is pushed to:
+    the total hits and the most recent match. The per-firewall breakdown is in
+    ``hit_devices``.
+    """
     if rule.hits is None:
         return "not collected"
     if rule.hits.is_unused:
         return "never matched"
     last = f", last {rule.hits.last_hit:%Y-%m-%d}" if rule.hits.last_hit else ""
     return f"{rule.hits.hit_count:,} hits{last}".replace(",", " ")
+
+
+def hit_devices(rule: SecurityRule) -> str:
+    """Per-firewall usage breakdown, newest match first; empty when not applicable.
+
+    Used as a tooltip beside the aggregated summary, so a reader can see a rule
+    is used on one firewall and idle on the four others it was pushed to.
+    """
+    if rule.hits is None or not rule.hits.per_device:
+        return ""
+    lines = []
+    for device in rule.hits.per_device:
+        count = f"{device.hit_count:,}".replace(",", " ")
+        when = f"last {device.last_hit:%Y-%m-%d}" if device.last_hit else "never matched"
+        lines.append(f"{device.device}: {count} hits, {when}")
+    return "\n".join(lines)
 
 
 def rule_status(rule: SecurityRule) -> str:
