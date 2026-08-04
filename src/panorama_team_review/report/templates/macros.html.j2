@@ -68,9 +68,9 @@
   {{ peer_cell if peers_first else own_cell }}{{ own_cell if peers_first else peer_cell }}
   <td class="svc">{{ rule.services | services_text }}</td>
   <td>{{ rule.applications | join(", ") if rule.applications != ["any"] else "any" }}</td>
-  {% if show_findings %}
-  <td>{{ tickets(rule) }}</td>
+  {% if show_findings %}<td>{{ tickets(rule) }}</td>{% endif %}
   {% if show_usage %}{% set devices = rule | hit_devices %}<td class="num"{% if devices %} title="{{ devices }}"{% endif %}>{{ rule | hit_summary }}</td>{% endif %}
+  {% if show_findings %}
   <td>
     {%- for finding in view.findings %}{{ severity_badge(finding.severity.value) }} {% endfor -%}
     {%- if not view.findings %}<span class="pill">ok</span>{% endif %}
@@ -79,11 +79,11 @@
   <td><button class="toggle" data-toggle="{{ index }}" aria-expanded="false">details</button></td>
 </tr>
 <tr class="detail-row hidden" data-detail="{{ index }}" data-scope="{{ view.scope_id }}">
-  <td colspan="{{ columns }}">{{ rule_detail(view, show_findings) }}</td>
+  <td colspan="{{ columns }}">{{ rule_detail(view, show_findings, show_usage) }}</td>
 </tr>
 {% endmacro %}
 
-{% macro rule_detail(view, show_findings=true) %}
+{% macro rule_detail(view, show_findings=true, show_usage=true) %}
 {%- set rule = view.rule -%}
 {#- The networks that put this rule in the reader's report are shown bold
     wherever they appear, so the "why" line below points at something visible
@@ -168,7 +168,7 @@
 </dl>
 {% endif %}
 
-{% if rule.hits and show_findings %}
+{% if rule.hits and show_usage %}
 <dl class="detail-grid"><div style="grid-column: 1 / -1">
   <dt>Usage</dt>
   <dd>{{ rule | hit_summary }} &mdash; collected {{ rule.hits.collected_at.strftime("%Y-%m-%d %H:%M") if rule.hits.collected_at }} from {{ rule.hits.source }}
@@ -215,7 +215,7 @@
 {%- set columns = 7
     + (1 if show_direction else 0)
     + (2 if show_findings else 0)
-    + (1 if show_findings and show_usage else 0) -%}
+    + (1 if show_usage else 0) -%}
 <section class="block" data-section="{{ section_id }}" id="s-{{ section_id }}">
   {{ section_heading(title, count ~ (" rule" if count == 1 else " rules"), section_id) }}
   <div class="collapsible" data-body="{{ section_id }}">
@@ -231,9 +231,9 @@
           {% if peers_first %}<th>Other side</th><th>Your networks</th>
           {% else %}<th>Your networks</th><th>Other side</th>{% endif %}
           <th>Service</th><th>Application</th>
-          {% if show_findings %}
-          <th>Ticket</th>{% if show_usage %}<th>Usage</th>{% endif %}<th>Findings</th>
-          {% endif %}
+          {% if show_findings %}<th>Ticket</th>{% endif %}
+          {% if show_usage %}<th>Usage</th>{% endif %}
+          {% if show_findings %}<th>Findings</th>{% endif %}
           <th></th>
         </tr>
       </thead>

@@ -68,6 +68,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Shared rules no longer show "not collected" when they have hits.** A shared
+  pre/post rule is pushed to every managed firewall, so its counters arrive
+  keyed by each firewall's serial rather than by any device group -- and the
+  matcher only aggregated per-firewall counters for rules that named a device
+  group, so shared rules fell through to a scope-qualified lookup that a
+  Panorama-collected cache never contains. They are now summed across every
+  firewall, the same way a device-group rule sums its subtree.
 - **The Excel writer no longer re-parses the same networks millions of times.**
   Matching a team's assets against a rule's members parsed every CIDR string
   afresh for each comparison, and estate-wide rules repeat across every team, so
@@ -103,6 +110,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Usage is shown for the rules that also cover a team, and reads as an age.**
+  The "Rules that also cover your networks" section now carries the same usage
+  column as a team's own rules -- knowing an estate-wide rule is heavily used or
+  long idle is exactly the kind of thing worth seeing there. And the summary now
+  says how long ago the last hit was ("last today", "last 2 weeks ago", "last
+  1 year ago") rather than a bare date, which is what a reader judging whether a
+  rule is still live actually wants; the exact date stays in the per-firewall
+  breakdown and the expanded row.
 - **Reports separate a team's own rules from the ones that merely cover them.**
   A rule naming an object inside a team's address space was written for that
   team; a rule naming `10.0.0.0/8`, or `any`, covers them along with everyone

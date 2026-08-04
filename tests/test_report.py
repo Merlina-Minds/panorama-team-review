@@ -57,6 +57,34 @@ def test_hit_devices_empty_without_a_breakdown():
     assert fmt.hit_devices(rule) == ""
 
 
+def test_relative_age_reads_in_words():
+    from datetime import datetime
+
+    ref = date(2026, 8, 4)
+
+    def age(y, m, d):
+        return fmt.relative_age(datetime(y, m, d), today=ref)
+
+    assert age(2026, 8, 4) == "today"
+    assert age(2026, 8, 3) == "yesterday"
+    assert age(2026, 8, 1) == "3 days ago"
+    assert age(2026, 7, 21) == "2 weeks ago"
+    assert age(2026, 6, 1) == "2 months ago"
+    assert age(2025, 8, 4) == "1 year ago"
+    assert age(2023, 8, 4) == "3 years ago"
+
+
+def test_hit_summary_uses_relative_wording():
+    from datetime import datetime
+
+    from panorama_team_review.model import HitCount, Location, SecurityRule
+
+    rule = SecurityRule(name="r", location=Location(source="t"))
+    rule.hits = HitCount(hit_count=1234, last_hit=datetime.now())
+    assert "last today" in fmt.hit_summary(rule)
+    assert "1 234 hits" in fmt.hit_summary(rule)
+
+
 def test_matched_networks_lead_the_resolved_list():
     """The network that put the rule in the report reads first, not buried."""
     from panorama_team_review.report.html import _highlight_networks
@@ -285,6 +313,50 @@ def test_html_combined_lists_every_team(bundle, config):
 def test_html_writes_a_file(bundle, config, tmp_path):
     path = html.write_team(bundle, bundle.teams[0], tmp_path / "r.html", config)
     assert path.stat().st_size > 5000
+
+
+def test_covered_rules_show_their_usage(config):
+    """Usage belongs in the 'also cover you' section too, not only own rules."""
+    from datetime import datetime
+
+    from panorama_team_review.model import (
+        AddressKind,
+        AddressObject,
+        HitCount,
+        Location,
+        SecurityRule,
+        Snapshot,
+        SnapshotMeta,
+        Team,
+    )
+
+    loc = Location(source="t.xml", shared=True)
+    rule = SecurityRule(
+        name="central-inbound",
+        location=Location(source="t.xml", device_group="DG"),
+        source=ResolvedAddresses(raw=["outside"]),
+        destination=ResolvedAddresses(raw=["big"]),
+    )
+    rule.hits = HitCount(hit_count=99, last_hit=datetime.now())
+    snap = Snapshot(
+        meta=SnapshotMeta(source_file="t.xml", parsed_at=datetime(2026, 7, 28)),
+        addresses=[
+            AddressObject(name="big", kind=AddressKind.IP_NETMASK,
+                          value="10.0.0.0/16", location=loc),
+            AddressObject(name="outside", kind=AddressKind.IP_NETMASK,
+                          value="192.168.0.0/24", location=loc),
+        ],
+        rules=[rule],
+    )
+    team = Team(id="small", name="Small", assets=["10.0.5.0/24"])
+    bundle = build_report(snap, [team], config, today=TODAY)
+    report = next(r for r in bundle.teams if r.team.id == "small")
+
+    assert report.covered_views, "the rule should cover the small team"
+    content = html.render_team(bundle, report, config)
+    section = content.split("Rules that also cover your networks", 1)[1]
+    assert "99 hits" in section
+    assert "last today" in section
 
 
 def test_html_puts_the_networks_before_the_rules(bundle, config):

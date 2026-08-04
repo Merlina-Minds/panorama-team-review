@@ -267,7 +267,7 @@
      "Inbound — who may already reach your networks",
      "Central rules that let other systems reach yours. This is exposure you did not request,
       which is exactly why it is worth reading.",
-     "covered-inbound", ns.offset, false, false, cov_inbound | length, false, labels, true) }}
+     "covered-inbound", ns.offset, false, false, cov_inbound | length, bundle.hitcount_available, labels, true) }}
   {% set ns.offset = ns.offset + cov_inbound | length %}
   {% endif %}
 
@@ -276,7 +276,7 @@
      "Outbound — what your networks may already reach",
      "Central rules that let your systems out: DNS, updates, monitoring and the like. No need to
       request any of this.",
-     "covered-outbound", ns.offset, false, false, cov_outbound | length, false, labels) }}
+     "covered-outbound", ns.offset, false, false, cov_outbound | length, bundle.hitcount_available, labels) }}
   {% set ns.offset = ns.offset + cov_outbound | length %}
   {% endif %}
 
@@ -285,7 +285,7 @@
   {{ m.scoped_rule_table(cov_other | group_by_scope(bundle.scopes),
      "Without a clear direction",
      "Rules permitting any source to any destination, so no side can be called yours or theirs.",
-     "covered-other", ns.offset, false, true, cov_other | length, false, labels) }}
+     "covered-other", ns.offset, false, true, cov_other | length, bundle.hitcount_available, labels) }}
   {% set ns.offset = ns.offset + cov_other | length %}
   {% endif %}
   {% endif %}

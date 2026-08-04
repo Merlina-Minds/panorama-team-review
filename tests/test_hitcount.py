@@ -420,6 +420,33 @@ def test_local_rule_takes_its_own_firewalls_counter():
     assert rule.hits is not None and rule.hits.hit_count == 7
 
 
+def test_shared_rule_sums_hits_across_every_firewall():
+    """A shared pre/post rule is pushed to every managed firewall, so its
+    counters live under each one's serial rather than any device group -- the
+    device-group branch never sees it."""
+    rule = SecurityRule(
+        name="allow-ntp", location=Location(source="t", shared=True, rulebase=Rulebase.PRE)
+    )
+    snapshot = _snapshot(
+        [rule],
+        device_groups={"DG": DeviceGroup(name="DG", devices=["S1", "S2"])},
+        devices=[
+            ManagedDevice(serial="S1", hostname="fw1", device_group="DG"),
+            ManagedDevice(serial="S2", hostname="fw2", device_group="DG"),
+        ],
+    )
+    counters = dict(
+        [
+            _device_counter("S1", "allow-ntp", hit_count=4, last_hit=datetime(2026, 7, 1)),
+            _device_counter("S2", "allow-ntp", hit_count=6, last_hit=datetime(2026, 7, 10)),
+        ]
+    )
+
+    assert hitcount._apply(snapshot.rules, counters, snapshot) == 1
+    assert rule.hits is not None and rule.hits.hit_count == 10
+    assert {d.device for d in rule.hits.per_device} == {"fw1", "fw2"}
+
+
 def test_device_group_rule_with_no_collected_firewalls_stays_unmatched():
     rule = SecurityRule(
         name="allow-web", location=Location(source="t", device_group="DG", rulebase=Rulebase.PRE)

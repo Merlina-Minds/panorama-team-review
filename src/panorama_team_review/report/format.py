@@ -8,7 +8,8 @@ formatting decisions so downstream consumers get raw values.
 from __future__ import annotations
 
 import ipaddress
-from functools import lru_cache
+from datetime import date, datetime
+from functools import cache
 from typing import NamedTuple
 
 from ..model import (
@@ -24,7 +25,7 @@ from ..model import (
 )
 
 
-@lru_cache(maxsize=None)
+@cache
 def _network(cidr: str) -> IPNetwork:
     """Parse a CIDR string, memoised.
 
@@ -124,15 +125,38 @@ def hit_summary(rule: SecurityRule) -> str:
     """One-cell summary of a rule's usage, or why usage is unknown.
 
     On Panorama this is the aggregate across the firewalls the rule is pushed to:
-    the total hits and the most recent match. The per-firewall breakdown is in
-    ``hit_devices``.
+    the total hits and how long ago the most recent match was. The exact date is
+    kept in the per-firewall breakdown (``hit_devices``) and the expanded row.
     """
     if rule.hits is None:
         return "not collected"
     if rule.hits.is_unused:
         return "never matched"
-    last = f", last {rule.hits.last_hit:%Y-%m-%d}" if rule.hits.last_hit else ""
+    last = f", last {relative_age(rule.hits.last_hit)}" if rule.hits.last_hit else ""
     return f"{rule.hits.hit_count:,} hits{last}".replace(",", " ")
+
+
+def relative_age(when: datetime, today: date | None = None) -> str:
+    """How long ago ``when`` was, in words -- 'today', '3 days ago', '2 years ago'.
+
+    Coarse on purpose: a reader deciding whether a rule is still used wants "a
+    few weeks" or "over a year", not a date to subtract in their head. The exact
+    timestamp stays in the breakdown for anyone who needs it.
+    """
+    today = today or date.today()
+    days = (today - when.date()).days
+    if days <= 0:
+        return "today"
+    if days == 1:
+        return "yesterday"
+    if days < 14:
+        return f"{days} days ago"
+    if days < 60:
+        return f"{days // 7} weeks ago"
+    if days < 365:
+        return f"{days // 30} months ago"
+    years = days // 365
+    return f"{years} year{'s' if years > 1 else ''} ago"
 
 
 def hit_devices(rule: SecurityRule) -> str:

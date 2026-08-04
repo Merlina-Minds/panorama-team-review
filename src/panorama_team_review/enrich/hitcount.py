@@ -121,6 +121,7 @@ def _apply(
 
     serial_host = {d.serial: (d.hostname or d.serial) for d in snapshot.devices} if snapshot else {}
     dg_serials = _dg_subtree_serials(snapshot.device_groups) if snapshot else {}
+    all_serials = {d.serial for d in snapshot.devices} if snapshot else set()
 
     matched = 0
     for rule in rules:
@@ -132,6 +133,12 @@ def _apply(
             serial = _serial_for_device(snapshot, loc.device)
             if serial is not None:
                 hit = _aggregate(raw, {serial}, rule.name, serial_host)
+        elif raw and snapshot is not None and loc.shared:
+            # A shared pre/post rule is pushed to every managed firewall, so its
+            # counters live under each one's serial rather than any device
+            # group -- the device-group branch above never sees it. Sum across
+            # every firewall, the same way a device-group rule sums its subtree.
+            hit = _aggregate(raw, all_serials, rule.name, serial_host)
 
         if hit is None:
             hit = direct.get(_rule_key(rule))
