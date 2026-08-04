@@ -22,19 +22,23 @@ Design constraints, all of them deliberate:
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from lxml import etree
 
+from .. import panos_api
 from ..config import HitCountConfig
 from ..errors import EnrichmentError
 from ..model import HitCount, SecurityRule, Snapshot
 
-# Only these operational verbs may ever be sent.
-_ALLOWED_COMMAND_PREFIX = "<show>"
+# Transport is shared with the configuration-fetch feature. These aliases keep
+# the call sites below readable and the read-only guarantee in a single place.
+_operational = panos_api.operational
+_session = panos_api.open_session
+_api_key = panos_api.resolve_api_key
+_xml_escape = panos_api.xml_escape
 
 
 def enrich_snapshot(
@@ -204,46 +208,6 @@ def _list_device_groups(
     return [(name, base) for name in names for base in ("pre", "post")]
 
 
-def _operational(
-    session: Any, device: str, key: str, command: str, config: HitCountConfig
-) -> etree._Element:
-    """Issue one operational command and return the parsed ``<result>``."""
-    if not command.startswith(_ALLOWED_COMMAND_PREFIX):
-        # Defence in depth: this module must never be able to change a device.
-        raise EnrichmentError(f"refusing to send a non-'show' command: {command[:40]}")
-
-    url = f"https://{device}/api/"
-    try:
-        response = session.post(
-            url,
-            data={"type": "op", "cmd": command, "key": key},
-            timeout=config.timeout_seconds,
-            verify=str(config.ca_bundle) if config.ca_bundle else config.verify_tls,
-        )
-    except Exception as exc:  # noqa: BLE001 - network errors of every shape
-        raise EnrichmentError(f"request to {device} failed: {exc}") from exc
-
-    if response.status_code != 200:
-        raise EnrichmentError(f"{device} returned HTTP {response.status_code}")
-
-    try:
-        root = etree.fromstring(
-            response.content,
-            etree.XMLParser(resolve_entities=False, no_network=True),
-        )
-    except etree.XMLSyntaxError as exc:
-        raise EnrichmentError(f"{device} returned malformed XML: {exc}") from exc
-
-    if root.get("status") != "success":
-        message = root.findtext(".//msg") or root.findtext(".//line") or "unknown error"
-        raise EnrichmentError(f"{device} rejected the command: {message.strip()}")
-
-    result = root.find("result")
-    if result is None:
-        raise EnrichmentError(f"{device} returned no result element")
-    return result
-
-
 def _parse_hit_counts(
     result: etree._Element, scope: str, rulebase: str, source: str, collected_at: datetime
 ) -> dict[str, HitCount]:
@@ -282,60 +246,6 @@ def _timestamp(value: str | None) -> datetime | None:
         return datetime.fromtimestamp(int(raw))
     except (ValueError, OSError, OverflowError):
         return None
-
-
-def _xml_escape(value: str) -> str:
-    return (
-        value.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("'", "&apos;")
-        .replace('"', "&quot;")
-    )
-
-
-# ---------------------------------------------------------------------------
-# Credentials and transport
-# ---------------------------------------------------------------------------
-
-
-def _api_key(config: HitCountConfig) -> str:
-    if config.api_key_file:
-        if not config.api_key_file.is_file():
-            raise EnrichmentError(f"API key file not found: {config.api_key_file}")
-        key = config.api_key_file.read_text(encoding="utf-8").strip()
-        if not key:
-            raise EnrichmentError(f"API key file is empty: {config.api_key_file}")
-        return key
-
-    key = os.environ.get(config.api_key_env, "").strip()
-    if not key:
-        raise EnrichmentError(
-            f"no API key: set the {config.api_key_env} environment variable, or point "
-            "hitcounts.api_key_file at a file containing the key. "
-            "Keys are never read from the configuration file itself."
-        )
-    return key
-
-
-def _session(config: HitCountConfig):
-    try:
-        import requests
-    except ImportError as exc:
-        raise EnrichmentError(
-            "hit-count collection requires the optional 'requests' dependency.\n"
-            "  Install it with:  pip install 'panorama-team-review[api]'"
-        ) from exc
-
-    session = requests.Session()
-    session.headers["User-Agent"] = "panorama-team-review"
-    if not config.verify_tls:
-        # Explicitly requested; warn loudly because it defeats the point of TLS
-        # on a management interface.
-        import urllib3
-
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    return session
 
 
 # ---------------------------------------------------------------------------

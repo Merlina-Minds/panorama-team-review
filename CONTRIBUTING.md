@@ -92,13 +92,15 @@ pan-review -c demo/config.yaml -v run
 A one-way pipeline. Each stage only knows about the one before it.
 
 ```text
+  [optional, opt-in, network access]  fetch.py + panos_api.py  pull the running config over the API
+    ▼
 backup file
     │  parse/loader.py      find, decompress, parse XML safely
     ▼
   Snapshot                  parse/panos.py, parse/common.py
     │  resolve/objects.py   groups → networks, services → ports
     │  enrich/metadata.py   descriptions → tickets, dates, requester
-    │  enrich/hitcount.py   [optional, opt-in, the only network access]
+    │  enrich/hitcount.py   [optional, opt-in, network access]
     │  resolve/ownership.py rules → teams, with direction and coverage
     │  resolve/evaluation.py where a rule sits in the evaluation order
     │  analyze/findings.py  cleanup checks
@@ -139,6 +141,8 @@ four times is four chances to derive it differently.
 | `resolve/inventory.py` | Team/asset inventory loading |
 | `enrich/metadata.py` | Tickets, dates and requesters from free text |
 | `enrich/hitcount.py` | Optional hit-count collection |
+| `panos_api.py` | Shared read-only PAN-OS/Panorama XML-API transport (the only network code) |
+| `fetch.py` | Optional live configuration fetch, reusing the hitcounts connection |
 | `analyze/findings.py` | The cleanup checks |
 | `analyze/inventory_gaps.py` | Object names checked against the inventory: who owns which network |
 | `report/` | Assembly and the four renderers |
@@ -171,6 +175,7 @@ areas where a contribution would genuinely reduce risk, worst first:
 |---|---|
 | Real configurations | **None.** Everything runs against the generator, which encodes assumptions about what real estates look like |
 | Hit-count API | Fakes only. `_list_vsys` and `_list_device_groups` have never spoken to a device |
+| Configuration fetch | Fakes only. The export transport in `panos_api.py` has never spoken to a device |
 | Multi-vsys, template stacks, `dg-meta-data` | Code paths exist, no test case — no sample was available |
 | PDF and Excel content | Verified as "is a PDF" and "has these sheets", not on cell or page content |
 | Scale | Nothing above ~100 rules. The prefix trie should hold up; that is a claim, not a measurement |

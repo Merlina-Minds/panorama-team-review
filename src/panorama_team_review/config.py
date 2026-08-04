@@ -67,6 +67,40 @@ class ConfigModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class FetchConfig(ConfigModel):
+    """Optionally pull the configuration backup live from the devices.
+
+    Off by default.  When on, ``run`` downloads the running configuration from
+    each configured device into ``backup_dir`` before analysing it, so a
+    separately scheduled export landing on disk is no longer required.
+
+    The connection -- devices, API key, TLS -- is the *same* as hit-count
+    collection and is taken from the ``hitcounts`` section, so the access is
+    configured once.  Read-only: only the configuration export endpoint is ever
+    called.
+    """
+
+    enabled: bool = False
+    filename_template: str = Field(
+        default="{device}_{date}.xml",
+        description="Name for each downloaded configuration. Placeholders: {device}, {date}.",
+    )
+
+    @field_validator("filename_template")
+    @classmethod
+    def _known_placeholders(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("fetch.filename_template must not be empty")
+        allowed = {"device", "date"}
+        unknown = set(re.findall(r"\{(\w+)\}", value)) - allowed
+        if unknown:
+            raise ValueError(
+                f"fetch.filename_template uses unknown placeholder(s) {sorted(unknown)}; "
+                f"allowed: {sorted(allowed)}"
+            )
+        return value
+
+
 class InputConfig(ConfigModel):
     """Where backups come from.
 
@@ -102,6 +136,12 @@ class InputConfig(ConfigModel):
         default=None,
         description="Fail if the newest backup is older than this. Guards against a silently "
         "broken backup job feeding stale reports into a review cycle.",
+    )
+
+    fetch: FetchConfig = Field(
+        default_factory=FetchConfig,
+        description="Optionally pull the configuration live from the devices instead of "
+        "relying on a scheduled export landing in backup_dir. Reuses the hitcounts connection.",
     )
 
     @field_validator("backup_dir", mode="before")
@@ -673,16 +713,15 @@ class AnalysisConfig(ConfigModel):
 # ---------------------------------------------------------------------------
 
 
-class HitCountConfig(ConfigModel):
-    """Live rule-hit-count enrichment.
+class ConnectionConfig(ConfigModel):
+    """How to reach a firewall or Panorama over the XML API.
 
-    Hit counters are runtime state and are never contained in a configuration
-    backup, so obtaining them requires talking to the device.  This is the only
-    part of the tool that touches the network, it is disabled by default, and
-    it issues read-only operational commands exclusively.
+    Shared by every network-facing feature -- hit-count collection and live
+    configuration fetch -- so the device list, credentials and TLS policy are
+    stated once.  The API key is never read from this file: it comes from an
+    environment variable or a key file, so the configuration stays shareable.
     """
 
-    enabled: bool = False
     devices: list[str] = Field(
         default_factory=list, description="Hostnames or IPs of firewalls / Panorama"
     )
@@ -696,6 +735,18 @@ class HitCountConfig(ConfigModel):
     verify_tls: bool = True
     ca_bundle: Path | None = None
     timeout_seconds: int = 30
+
+
+class HitCountConfig(ConnectionConfig):
+    """Live rule-hit-count enrichment.
+
+    Hit counters are runtime state and are never contained in a configuration
+    backup, so obtaining them requires talking to the device.  This is one of
+    only two parts of the tool that touch the network, it is disabled by
+    default, and it issues read-only operational commands exclusively.
+    """
+
+    enabled: bool = False
     rulebases: list[str] = Field(default_factory=lambda: ["security"])
     cache_dir: Path | None = Field(
         default=None,

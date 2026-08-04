@@ -15,9 +15,9 @@ into real networks and ports, works out which team each rule concerns and on
 which side of the connection they sit, and produces a report per team as HTML,
 Excel, PDF and JSON.
 
-The tool performs **no network access**. The single exception is optional
-hit-count collection, which is disabled by default and must be enabled
-explicitly.
+The tool performs **no network access** by default. There are two optional,
+opt-in exceptions: hit-count collection and live configuration fetch. Both are
+disabled unless explicitly enabled, and both are read-only.
 
 ---
 
@@ -31,6 +31,7 @@ explicitly.
 - [Tickets and dates in rule descriptions](#tickets-and-dates-in-rule-descriptions)
 - [Cleanup findings](#cleanup-findings)
 - [Rule hit counts](#rule-hit-counts)
+- [Fetching the configuration live](#fetching-the-configuration-live)
 - [Running from cron](#running-from-cron)
 - [Commands](#commands)
 - [Installation](#installation)
@@ -57,18 +58,26 @@ the cleanup candidates called out.
 
 ## Quick start
 
+The package is not published to PyPI yet, so install it from a checkout of this
+repository (see [Installation](#installation) for uv and venv details):
+
 ```bash
-pip install panorama-team-review
+# Not available yet — the package is not on PyPI:
+# pip install panorama-team-review
+
+git clone https://github.com/Merlina-Minds/panorama-team-review
+cd panorama-team-review
+uv sync                                      # create the env and install
 
 # Write a commented configuration and inventory to the current directory
-pan-review init .
+uv run pan-review init .
 
 # Edit inventory.yaml: map your networks to teams
 # Edit config.yaml: point input.backup_dir at your backup directory
 
-pan-review -c config.yaml validate    # check the configuration
-pan-review -c config.yaml inspect     # see what the tool reads from a backup
-pan-review -c config.yaml run         # produce the reports
+uv run pan-review -c config.yaml validate    # check the configuration
+uv run pan-review -c config.yaml inspect     # see what the tool reads from a backup
+uv run pan-review -c config.yaml run         # produce the reports
 ```
 
 ## See it first
@@ -92,17 +101,18 @@ To build your own synthetic estate instead:
 ```bash
 git clone https://github.com/Merlina-Minds/panorama-team-review
 cd panorama-team-review
-pip install -e ".[dev,pdf]"
+uv sync --extra dev --extra pdf
+# Plain venv instead: python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev,pdf]"
 
 mkdir -p demo/backups
-python -c "
+uv run python -c "
 import sys; sys.path.insert(0, 'tests')
 from fixtures.generator import generate_panorama
 open('demo/backups/config.xml','w').write(generate_panorama())
 "
 cp config/inventory.example.yaml demo/inventory.yaml
 printf 'input:\n  backup_dir: ./backups\nteams_file: inventory.yaml\noutput:\n  directory: ./reports\n' > demo/config.yaml
-pan-review -c demo/config.yaml run
+uv run pan-review -c demo/config.yaml run
 ```
 
 ## How rules are attributed to teams
@@ -400,10 +410,10 @@ backup**. A PAN-OS or Panorama export holds the policy, not the counters. So
 "is this rule still used?" — the most useful question in a cleanup — cannot be
 answered offline.
 
-Collecting them is therefore a separate, opt-in module. It is the only part of
-this tool that touches the network, it issues read-only `show` operational
-commands exclusively, and the command is checked against that before it is
-sent.
+Collecting them is therefore a separate, opt-in module. It is one of only two
+parts of this tool that touch the network, it issues read-only `show`
+operational commands exclusively, and the command is checked against that
+before it is sent.
 
 ```yaml
 hitcounts:
@@ -425,6 +435,41 @@ The recommended arrangement keeps reporting offline:
 ```
 
 Use an API key bound to a read-only administrator role.
+
+## Fetching the configuration live
+
+If the tool already reaches the devices for hit counts, it can pull the
+configuration backup from the same place instead of depending on a separate
+scheduled export landing on disk. This is the second optional network feature,
+and like hit-count collection it is off by default and read-only — only the
+configuration export endpoint is ever called.
+
+**The connection is the same as hit-count collection**: devices, API key and
+TLS come from the `hitcounts` section, so the access is configured once. You do
+not have to collect hit counts to fetch — leave `hitcounts.enabled: false` and
+still list the devices there.
+
+```yaml
+input:
+  backup_dir: /var/backups/panorama
+  fetch:
+    enabled: true
+hitcounts:
+  devices: [panorama.example.com]   # connection only; collection stays off
+  api_key_env: PAN_API_KEY
+```
+
+With `input.fetch.enabled`, `pan-review run` downloads each device's running
+configuration into `backup_dir` first, then analyses the newest exactly as if a
+scheduled export had written it there. A fetch failure is a warning, not fatal:
+the run falls back to what is already on disk, and `max_age_days` still guards
+against that being stale. It can also be scheduled on its own so reporting
+stays offline:
+
+```cron
+0 1 * * *  PAN_API_KEY=... pan-review -c /etc/ptr/config.yaml fetch-backup
+0 6 * * 1  pan-review -c /etc/ptr/config.yaml -q run --no-network
+```
 
 ## Running from cron
 
@@ -460,6 +505,7 @@ pan-review diff OLD NEW       Compare two JSON reports: what changed since last 
 pan-review init [DIR]         Write a commented example configuration.
 pan-review suggest-inventory  Derive a draft inventory from a configuration.
 pan-review collect-hitcounts  Refresh the hit-count cache (network access).
+pan-review fetch-backup       Pull the running configuration from the devices (network access).
 pan-review scrub SRC DST      Pseudonymise a configuration for a bug report.
 ```
 
@@ -486,10 +532,46 @@ none from the teams the report is for.
 Requires Python 3.11 or newer. Linux is the primary target; macOS and Windows
 work.
 
+The package is not published to PyPI yet, so install it from a checkout of this
+repository. Once it is on PyPI, the direct install will be:
+
 ```bash
-pip install panorama-team-review          # core: HTML, Excel, JSON
-pip install 'panorama-team-review[pdf]'   # adds PDF output
-pip install 'panorama-team-review[api]'   # adds hit-count collection
+# Not available yet:
+# pip install panorama-team-review          # core: HTML, Excel, JSON
+# pip install 'panorama-team-review[pdf]'   # adds PDF output
+# pip install 'panorama-team-review[api]'   # adds hit-count collection
+```
+
+### With uv (recommended)
+
+[uv](https://docs.astral.sh/uv/) creates the virtual environment and installs
+the project in one step:
+
+```bash
+git clone https://github.com/Merlina-Minds/panorama-team-review
+cd panorama-team-review
+
+uv sync                            # core: HTML, Excel, JSON
+uv sync --extra pdf                # adds PDF output
+uv sync --extra pdf --extra api    # adds PDF output and hit-count collection
+
+uv run pan-review --help           # run without activating the environment
+```
+
+### With a plain venv
+
+```bash
+git clone https://github.com/Merlina-Minds/panorama-team-review
+cd panorama-team-review
+
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+pip install -e .                   # core: HTML, Excel, JSON
+pip install -e '.[pdf]'            # adds PDF output
+pip install -e '.[pdf,api]'        # adds PDF output and hit-count collection
+
+pan-review --help
 ```
 
 PDF output uses WeasyPrint, which needs system libraries:

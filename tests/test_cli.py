@@ -493,6 +493,106 @@ def test_collect_hitcounts_refuses_when_disabled(runner, estate):
     assert "disabled" in result.output
 
 
+def test_fetch_backup_refuses_when_disabled(runner, estate):
+    """The network-facing command must never run by accident."""
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "fetch-backup"])
+    assert result.exit_code == EXIT_CONFIG
+    assert "disabled" in result.output
+
+
+def test_fetch_backup_writes_into_the_backup_directory(runner, estate, panorama_xml, monkeypatch):
+    from panorama_team_review import panos_api
+
+    monkeypatch.setenv("PAN_API_KEY", "secret")
+    monkeypatch.setattr(panos_api, "open_session", lambda conn: object())
+    monkeypatch.setattr(
+        panos_api, "export_configuration", lambda *a, **k: panorama_xml.encode("utf-8")
+    )
+
+    (estate / "config.yaml").write_text(
+        "input:\n"
+        "  backup_dir: ./backups\n"
+        "  fetch:\n"
+        "    enabled: true\n"
+        "teams_file: inventory.yaml\n"
+        "hitcounts:\n"
+        "  devices: [panorama.example.com]\n"
+        "output:\n"
+        "  directory: ./reports\n"
+        "  formats: [json]\n"
+        "  timestamped_subdir: false\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "fetch-backup"])
+    assert result.exit_code == EXIT_OK, result.output
+    fetched = list((estate / "backups").glob("panorama.example.com_*.xml"))
+    assert fetched, "the fetched configuration should be written into backup_dir"
+
+
+def test_run_fetches_configuration_when_enabled(runner, estate, panorama_xml, monkeypatch):
+    from panorama_team_review import panos_api
+
+    monkeypatch.setenv("PAN_API_KEY", "secret")
+    monkeypatch.setattr(panos_api, "open_session", lambda conn: object())
+    captured: dict = {}
+
+    def fake_export(session, device, key, conn):
+        captured["device"] = device
+        return panorama_xml.encode("utf-8")
+
+    monkeypatch.setattr(panos_api, "export_configuration", fake_export)
+
+    (estate / "config.yaml").write_text(
+        "input:\n"
+        "  backup_dir: ./backups\n"
+        "  fetch:\n"
+        "    enabled: true\n"
+        "teams_file: inventory.yaml\n"
+        "hitcounts:\n"
+        "  devices: [panorama.example.com]\n"
+        "output:\n"
+        "  directory: ./reports\n"
+        "  formats: [json]\n"
+        "  timestamped_subdir: false\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
+    assert result.exit_code == EXIT_OK, result.output
+    assert captured["device"] == "panorama.example.com"
+    assert list((estate / "backups").glob("panorama.example.com_*.xml"))
+
+
+def test_run_skips_fetch_with_no_network(runner, estate, monkeypatch):
+    """--no-network must force offline operation even with fetch enabled."""
+    from panorama_team_review import panos_api
+
+    def explode(*args, **kwargs):
+        raise AssertionError("fetch must not run with --no-network")
+
+    monkeypatch.setattr(panos_api, "export_configuration", explode)
+
+    (estate / "config.yaml").write_text(
+        "input:\n"
+        "  backup_dir: ./backups\n"
+        "  fetch:\n"
+        "    enabled: true\n"
+        "teams_file: inventory.yaml\n"
+        "hitcounts:\n"
+        "  devices: [panorama.example.com]\n"
+        "output:\n"
+        "  directory: ./reports\n"
+        "  formats: [json]\n"
+        "  timestamped_subdir: false\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run", "--no-network"])
+    assert result.exit_code == EXIT_OK, result.output
+
+
+
 # ---------------------------------------------------------------------------
 # Multi-tenant operation
 # ---------------------------------------------------------------------------

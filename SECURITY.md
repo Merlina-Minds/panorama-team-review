@@ -42,9 +42,9 @@ of an organisation's network segmentation.
 | Decompression bomb in a `.gz` or `.tgz` | Members capped at 2 GiB, enforced before extraction |
 | Path traversal from archive members | Only in-memory reads; nothing is extracted to disk |
 | Malicious rule names or descriptions reaching a report | Jinja autoescaping on for all data; only the tool's own stylesheets bypass it. Tested in `test_html_escapes_rule_content`. |
-| Unintended device modification | The hit-count module accepts only `show` operational commands, checked before sending |
+| Unintended device modification | Both network features are read-only: the hit-count module accepts only `show` operational commands (checked before sending), and configuration fetch only ever requests `type=export&category=configuration` |
 | Credential exposure | API keys are read from an environment variable or a key file, never from the configuration file; `config/config.yaml` is gitignored |
-| Unintended network access | No network code outside `enrich/hitcount.py`, which is disabled by default; CI verifies a full run completes with outbound traffic blocked |
+| Unintended network access | Network code lives only in `panos_api.py` (shared transport) and its two callers `enrich/hitcount.py` and `fetch.py`, all disabled by default; CI verifies a full run completes with outbound traffic blocked |
 
 ### What it does not protect against
 
@@ -65,9 +65,10 @@ of an organisation's network segmentation.
 
 - Run as an unprivileged user with read access to the backup directory and
   write access to the output directory. Nothing else is needed.
-- Keep hit-count collection disabled unless you need it. If you enable it, use
-  an API key bound to a **read-only administrator role**, supplied through the
-  environment or a mode-`0600` key file.
+- Keep the network features (hit-count collection and configuration fetch)
+  disabled unless you need them. If you enable either, use an API key bound to a
+  **read-only administrator role**, supplied through the environment or a
+  mode-`0600` key file.
 - Restrict access to the output directory. Reports are as sensitive as the
   configuration they describe.
 - Set `input.max_age_days` so a broken backup job fails loudly rather than

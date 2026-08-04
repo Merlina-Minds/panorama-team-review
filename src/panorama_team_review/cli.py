@@ -79,8 +79,8 @@ class Context:
 def main(ctx: click.Context, config_path: Path | None, quiet: bool, verbose: bool) -> None:
     """Generate owner-centric firewall rule reviews from offline PAN-OS backups.
 
-    The tool never contacts a firewall unless hit-count collection is explicitly
-    enabled in the configuration.
+    The tool never contacts a firewall unless hit-count collection or live
+    configuration fetch is explicitly enabled in the configuration.
     """
     try:
         config = load_config(config_path)
@@ -143,6 +143,11 @@ def run(
     if formats:
         # click's Choice already constrains these to the valid format names.
         config.output.formats = cast(list[OutputFormat], list(formats))
+
+    # A live fetch only makes sense when analysing the configured directory; an
+    # explicit --backup is the manual case and is left untouched.
+    if backup is None and config.input.fetch.enabled:
+        _fetch_backups(ctx, no_network)
 
     try:
         backups = find_backups(config.input, backup)
@@ -212,6 +217,40 @@ def _load_snapshot(ctx: Context, path: Path) -> Snapshot:
     ctx.detail(f"{len(documents)} configuration document(s) in {path.name}")
     snapshots = [panos.parse(document, tool_version=__version__) for document in documents]
     return panos.merge(snapshots)
+
+
+def _fetch_backups(ctx: Context, no_network: bool) -> None:
+    """Pull a fresh configuration from the devices before analysing it.
+
+    Best-effort: a failure here is a warning, not the end of the run. The tool
+    falls back to whatever is already in the directory, and ``max_age_days``
+    still guards against that being stale.
+    """
+    config = ctx.config
+    if no_network:
+        ctx.detail("--no-network given: skipping live configuration fetch")
+        return
+    if config.input.backup_dir is None:
+        ctx.warn(
+            "input.fetch.enabled is set but input.backup_dir is not -- "
+            "nowhere to save a fetched configuration; using existing backups"
+        )
+        return
+
+    from . import fetch
+
+    try:
+        written, notes = fetch.fetch_backups(
+            config.input.fetch, config.hitcounts, config.input.backup_dir
+        )
+    except PanReviewError as exc:
+        ctx.warn(f"configuration fetch failed, using existing backups: {exc}")
+        return
+
+    for note in notes:
+        ctx.detail(note)
+    if written:
+        ctx.say(f"Fetched {len(written)} configuration(s) into {config.input.backup_dir}")
 
 
 def _enrich(ctx: Context, snapshot: Snapshot, no_network: bool) -> list[str]:
@@ -545,6 +584,24 @@ def validate(ctx: Context) -> None:
     else:
         click.echo("Hit counts:    disabled (fully offline)")
 
+    if config.input.fetch.enabled:
+        click.echo(
+            f"Config fetch:  enabled for {len(config.hitcounts.devices)} device(s) "
+            "-- this contacts the network"
+        )
+        if not config.hitcounts.devices:
+            problems.append(
+                "input.fetch.enabled is true but hitcounts.devices is empty "
+                "(configuration fetch reuses the hitcounts connection)"
+            )
+        if config.input.backup_dir is None:
+            problems.append(
+                "input.fetch.enabled is true but input.backup_dir is not set "
+                "(nowhere to save the fetched configuration)"
+            )
+    else:
+        click.echo("Config fetch:  disabled (backups read from disk)")
+
     click.echo(f"Output:        {config.output.directory}, formats: {', '.join(config.output.formats)}")
 
     if problems:
@@ -639,6 +696,47 @@ def collect_hitcounts(ctx: Context) -> None:
         sys.exit(EXIT_ERROR)
 
     click.echo(f"collected {len(counters)} rule counters into {config.cache_dir}")
+
+
+@main.command("fetch-backup")
+@click.pass_obj
+def fetch_backup(ctx: Context) -> None:
+    """Fetch the running configuration from the configured devices into the backup directory.
+
+    Separated from ``run`` so the network-facing part can be scheduled
+    independently -- pull a fresh configuration nightly, and keep ``run`` fully
+    offline. The connection is the same as hit-count collection and is taken
+    from the ``hitcounts`` section.
+    """
+    config = ctx.config
+    if not config.input.fetch.enabled:
+        click.echo(
+            "error: configuration fetch is disabled. Set input.fetch.enabled: true and list "
+            "the devices under hitcounts.devices (fetch reuses the hitcounts connection).",
+            err=True,
+        )
+        sys.exit(EXIT_CONFIG)
+    if config.input.backup_dir is None:
+        click.echo(
+            "error: input.backup_dir must be set for this command -- it is where the fetched "
+            "configuration is written.",
+            err=True,
+        )
+        sys.exit(EXIT_CONFIG)
+
+    from . import fetch
+
+    try:
+        written, notes = fetch.fetch_backups(
+            config.input.fetch, config.hitcounts, config.input.backup_dir
+        )
+    except PanReviewError as exc:
+        click.echo(f"error: {exc}", err=True)
+        sys.exit(EXIT_ERROR)
+
+    for note in notes:
+        ctx.detail(note)
+    click.echo(f"fetched {len(written)} configuration(s) into {config.input.backup_dir}")
 
 
 @main.command("suggest-inventory")

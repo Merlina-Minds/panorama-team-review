@@ -49,6 +49,23 @@ input:
   # Leave unset to disable the check.
   max_age_days: 7
 
+  # Optionally pull the running configuration live from the devices instead of
+  # relying on a scheduled export landing in backup_dir. Off by default. When
+  # enabled, `pan-review run` downloads each device's configuration into
+  # backup_dir first, then analyses the newest as usual (or schedule
+  # `pan-review fetch-backup` separately and keep `run` offline).
+  #
+  # The connection -- devices, API key, TLS -- is the SAME as hit-count
+  # collection and is taken from the `hitcounts` section below, so it is
+  # configured once. You can fetch without collecting hit counts: leave
+  # `hitcounts.enabled: false` and still fill in the devices there.
+  #
+  # Read-only: only the configuration export endpoint is ever called.
+  fetch:
+    enabled: false
+    # Name for each downloaded configuration. Placeholders: {device}, {date}.
+    filename_template: "{device}_{date}.xml"
+
 
 # ---------------------------------------------------------------------------
 # Where reports go
@@ -289,13 +306,17 @@ analysis:
 
 
 # ---------------------------------------------------------------------------
-# Hit counts -- OPTIONAL, and the only feature that touches the network
+# Hit counts -- OPTIONAL, and one of only two features that touch the network
 # ---------------------------------------------------------------------------
 #
 # Rule hit counters are runtime state and are NEVER contained in a
 # configuration backup. Answering "is this rule still used?" therefore requires
 # querying the device. This is disabled by default and issues read-only
 # operational commands only.
+#
+# The connection settings below (devices, api_key_env/api_key_file, verify_tls,
+# ca_bundle, timeout_seconds) are shared with the optional `input.fetch`
+# feature, so the access to the devices is configured once.
 #
 # Recommended setup: schedule `pan-review collect-hitcounts` once a night to
 # refresh the cache, and keep `pan-review run` fully offline by passing

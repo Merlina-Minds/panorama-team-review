@@ -103,6 +103,62 @@ date sort *below* every dated file rather than being mixed in, and the mtime
 breaks ties between files bearing the same date — which is what makes the
 rotating-directory case resolve sensibly.
 
+### `fetch`: pulling the configuration live
+
+```yaml
+input:
+  backup_dir: /var/backups/panorama
+  fetch:
+    enabled: false
+    filename_template: "{device}_{date}.xml"
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `fetch.enabled` | `false` | Download the running configuration from the devices before analysing it |
+| `fetch.filename_template` | `{device}_{date}.xml` | Name for each downloaded file. Placeholders: `{device}`, `{date}` |
+
+Off by default, because the tool's contract is that it works offline. When it
+is on, `pan-review run` first downloads each device's running configuration into
+`backup_dir`, then proceeds exactly as if those files had been written there by
+a scheduled export — the newest is picked, `max_age_days` still applies, and the
+downstream parser sees an identical document.
+
+**The connection is the same as hit-count collection.** Devices, API key and
+TLS come from the [`hitcounts`](#hitcounts--optional-network-access) section, so
+the access to the firewalls is configured once. You do not have to collect hit
+counts to fetch: leave `hitcounts.enabled: false` and still list the devices
+there.
+
+```yaml
+input:
+  backup_dir: /var/backups/panorama
+  fetch:
+    enabled: true
+hitcounts:
+  # connection only; hit-count collection stays off
+  devices: [panorama.example.com]
+  api_key_env: PAN_API_KEY
+```
+
+Read-only: only the configuration export endpoint is ever called, so the fetch
+cannot change a device. Like hit-count collection, it can be scheduled on its
+own so reporting stays offline:
+
+```cron
+0 1 * * *  PAN_API_KEY=... pan-review -c config.yaml fetch-backup
+0 6 * * 1  pan-review -c config.yaml -q run --no-network
+```
+
+During `run`, a fetch failure is a warning, not a fatal error: the tool falls
+back to whatever is already in `backup_dir`, and `max_age_days` still catches a
+directory that has gone stale. `--no-network` skips the fetch entirely. An
+explicit `--backup FILE` is the manual case and never triggers a fetch.
+
+With several devices listed, each writes its own file and `select` decides what
+`run` then does with them — a single Panorama (one file describing the whole
+estate) is the common case; list multiple firewalls together with `select: all`.
+
 ## `output` — where reports go
 
 ```yaml
@@ -592,9 +648,10 @@ hitcounts:
 ```
 
 Rule hit counters are runtime state and are **never** contained in a
-configuration backup. This is the only part of the tool that touches the
-network. It is disabled by default and issues read-only `show` operational
-commands exclusively.
+configuration backup. This is one of only two parts of the tool that touch the
+network (the other is [`input.fetch`](#fetch-pulling-the-configuration-live),
+which reuses the connection settings below). It is disabled by default and
+issues read-only `show` operational commands exclusively.
 
 The API key is read from an environment variable or a key file, never from this
 configuration file, so the configuration stays shareable. Use a key bound to a

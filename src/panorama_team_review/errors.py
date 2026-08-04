@@ -32,5 +32,9 @@ class EnrichmentError(PanReviewError):
     """Optional enrichment (hit counts) failed. Never fatal to the report."""
 
 
+class FetchError(PanReviewError):
+    """Optional live configuration fetch failed."""
+
+
 class RenderError(PanReviewError):
     """A renderer could not produce its output, e.g. a missing optional dependency."""

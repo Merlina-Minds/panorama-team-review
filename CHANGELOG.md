@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Optional live configuration fetch.** With `input.fetch.enabled`, the tool
+  pulls each device's running configuration into `backup_dir` before analysing
+  it, instead of depending on a scheduled export landing on disk. It reuses the
+  `hitcounts` connection (devices, API key, TLS), so the access is configured
+  once, and it can be run on its own with the new `pan-review fetch-backup`
+  command to keep reporting offline. Off by default and read-only: only the
+  configuration export endpoint is ever called. During `run` a fetch failure is
+  a warning that falls back to the backups already on disk, with `max_age_days`
+  still guarding against staleness.
+
 ### Changed
 
 - **Reports separate a team's own rules from the ones that merely cover them.**
