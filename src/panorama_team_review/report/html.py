@@ -284,6 +284,40 @@ def write_combined(bundle: ReportBundle, path: Path, config: Config) -> Path:
     return path
 
 
+def render_index(
+    bundle: ReportBundle,
+    config: Config,
+    entries: list[tuple[TeamReport, str]],
+    overview_href: str | None,
+) -> str:
+    """A landing page linking to every team's HTML report and the overview.
+
+    ``entries`` pairs each team report with the relative filename of its HTML
+    output; ``overview_href`` is the combined report's, or ``None`` when it was
+    not written.
+    """
+    template = _environment().get_template("index.html.j2")
+    return template.render(
+        bundle=bundle,
+        config=config,
+        css=_stylesheet("base.css"),
+        entries=entries,
+        overview_href=overview_href,
+    )
+
+
+def write_index(
+    bundle: ReportBundle,
+    config: Config,
+    path: Path,
+    entries: list[tuple[TeamReport, str]],
+    overview_href: str | None,
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_index(bundle, config, entries, overview_href), encoding="utf-8")
+    return path
+
+
 def _asset_counts(report: TeamReport) -> dict[str, dict[str, int]]:
     """Per-asset rule counts, so an owner can see which network draws traffic.
 

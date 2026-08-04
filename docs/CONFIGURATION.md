@@ -210,6 +210,11 @@ format may not contain a path separator: a run directory is a single level.
 `pdf` requires the `[pdf]` extra and its system libraries; `validate` reports
 it as a problem if it is configured but unusable.
 
+When `html` is among the formats, each run also writes an `index.html` beside
+the reports — a table of contents linking to every team's report and the
+cross-team overview, so opening the run's directory lands on a page to click
+through rather than a bare file listing.
+
 ### Rendering speed
 
 Turning the analysed estate into files is CPU-bound and, on a large estate with

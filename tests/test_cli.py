@@ -164,6 +164,24 @@ def test_run_format_override(runner, estate):
     assert not list((estate / "reports").glob("*.json"))
 
 
+def test_run_writes_an_html_index(runner, estate):
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run", "-f", "html"])
+    assert result.exit_code == EXIT_OK
+    index = estate / "reports" / "index.html"
+    assert index.is_file()
+    body = index.read_text(encoding="utf-8")
+    assert 'platform_firewall-review.html"' in body
+    assert 'payments_firewall-review.html"' in body
+    assert f'{OVERVIEW_MARK}.html"' in body
+
+
+def test_run_without_html_writes_no_index(runner, estate):
+    """The index is a table of contents for the HTML reports; JSON-only has none."""
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
+    assert result.exit_code == EXIT_OK
+    assert not (estate / "reports" / "index.html").exists()
+
+
 def test_run_output_override(runner, estate, tmp_path):
     target = tmp_path / "elsewhere"
     result = runner.invoke(

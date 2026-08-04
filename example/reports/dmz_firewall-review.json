@@ -5,14 +5,14 @@
       "example-estate.xml"
     ],
     "source_type": "panorama",
-    "file_mtime": "2026-07-30T19:26:01.773441",
-    "parsed_at": "2026-07-30T19:26:02.750276",
+    "file_mtime": "2026-08-04T22:41:04.400182",
+    "parsed_at": "2026-08-04T22:41:05.764384",
     "pan_os_version": "11.1.0",
     "hostname": "panorama.example.com",
     "tool_version": "0.1.0",
     "config_hash": "36184e5eb65b9931d22fc0f1f1b8a99e2765e85e8b3b009df8fb94a73e248e30"
   },
-  "generated_at": "2026-07-30T19:26:02.799649",
+  "generated_at": "2026-08-04T22:41:05.825758",
   "hitcount_available": false,
   "team": {
     "team": {
@@ -1198,7 +1198,7 @@
             "rule_name": "dmz-pre-08",
             "rule_uuid": "4a5696f6-4a28-e066-21cd-656f1bb68f11",
             "location": "DG-DMZ/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "dmz"
@@ -1683,7 +1683,7 @@
             "rule_name": "dmz-pre-11",
             "rule_uuid": "26a59a54-6c37-0c6e-3165-72fb172b6f4b",
             "location": "DG-DMZ/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "dmz"
@@ -1994,7 +1994,7 @@
             "rule_name": "dmz-pre-16",
             "rule_uuid": "1befbcde-e32b-ca15-408b-9cba84d629ad",
             "location": "DG-DMZ/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "dmz"
@@ -2162,7 +2162,7 @@
             "rule_name": "dmz-pre-19",
             "rule_uuid": "32c15d44-3c16-9b2b-4014-10718c80b35e",
             "location": "DG-DMZ/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "dmz"
@@ -2470,7 +2470,7 @@
             "rule_name": "dmz-pre-01",
             "rule_uuid": "85c979f6-5db8-2da2-0384-bf278fe9100c",
             "location": "DG-DMZ/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "dmz"
@@ -2638,7 +2638,7 @@
             "rule_name": "dmz-pre-06",
             "rule_uuid": "e26d9739-649a-d72f-d627-02579ca9c6e9",
             "location": "DG-DMZ/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "dmz"
@@ -3389,7 +3389,7 @@
             "rule_name": "dmz-post-01",
             "rule_uuid": "87b9d3e2-eff7-2207-a5f3-5e868f791c16",
             "location": "DG-DMZ/post",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "dmz"
@@ -4498,7 +4498,7 @@
         "rule_name": "dmz-pre-08",
         "rule_uuid": "4a5696f6-4a28-e066-21cd-656f1bb68f11",
         "location": "DG-DMZ/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "dmz"
@@ -4511,7 +4511,7 @@
         "rule_name": "dmz-pre-19",
         "rule_uuid": "32c15d44-3c16-9b2b-4014-10718c80b35e",
         "location": "DG-DMZ/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "dmz"
@@ -4615,7 +4615,7 @@
         "rule_name": "dmz-post-01",
         "rule_uuid": "87b9d3e2-eff7-2207-a5f3-5e868f791c16",
         "location": "DG-DMZ/post",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "dmz"
@@ -4628,7 +4628,7 @@
         "rule_name": "dmz-pre-01",
         "rule_uuid": "85c979f6-5db8-2da2-0384-bf278fe9100c",
         "location": "DG-DMZ/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "dmz"
@@ -4654,7 +4654,7 @@
         "rule_name": "dmz-pre-06",
         "rule_uuid": "e26d9739-649a-d72f-d627-02579ca9c6e9",
         "location": "DG-DMZ/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "dmz"
@@ -4680,7 +4680,7 @@
         "rule_name": "dmz-pre-11",
         "rule_uuid": "26a59a54-6c37-0c6e-3165-72fb172b6f4b",
         "location": "DG-DMZ/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "dmz"
@@ -4706,7 +4706,7 @@
         "rule_name": "dmz-pre-16",
         "rule_uuid": "1befbcde-e32b-ca15-408b-9cba84d629ad",
         "location": "DG-DMZ/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "dmz"

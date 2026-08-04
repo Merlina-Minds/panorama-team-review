@@ -5,14 +5,14 @@
       "example-estate.xml"
     ],
     "source_type": "panorama",
-    "file_mtime": "2026-07-30T19:26:01.773441",
-    "parsed_at": "2026-07-30T19:26:02.750276",
+    "file_mtime": "2026-08-04T22:41:04.400182",
+    "parsed_at": "2026-08-04T22:41:05.764384",
     "pan_os_version": "11.1.0",
     "hostname": "panorama.example.com",
     "tool_version": "0.1.0",
     "config_hash": "36184e5eb65b9931d22fc0f1f1b8a99e2765e85e8b3b009df8fb94a73e248e30"
   },
-  "generated_at": "2026-07-30T19:26:02.799649",
+  "generated_at": "2026-08-04T22:41:05.825758",
   "hitcount_available": false,
   "team": {
     "team": {
@@ -1102,7 +1102,7 @@
             "rule_name": "dmz-pre-11",
             "rule_uuid": "26a59a54-6c37-0c6e-3165-72fb172b6f4b",
             "location": "DG-DMZ/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -1268,7 +1268,7 @@
             "rule_name": "dmz-pre-16",
             "rule_uuid": "1befbcde-e32b-ca15-408b-9cba84d629ad",
             "location": "DG-DMZ/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -1614,7 +1614,7 @@
             "rule_name": "production-pre-11",
             "rule_uuid": "abf5638f-7603-7dfd-d61b-28f148ef395d",
             "location": "DG-Production/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -1780,7 +1780,7 @@
             "rule_name": "production-pre-16",
             "rule_uuid": "f1897738-0bbb-799c-8025-ab0c4bad02cb",
             "location": "DG-Production/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -2417,7 +2417,7 @@
             "rule_name": "development-pre-16",
             "rule_uuid": "8065412e-5053-2590-95ba-2e5684d8ab57",
             "location": "DG-Development/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -3357,7 +3357,7 @@
             "rule_name": "shared-services-pre-08",
             "rule_uuid": "e4b5ef1d-ee5a-41c9-93bb-4b9a676c9c8e",
             "location": "DG-Shared-Services/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -4000,7 +4000,7 @@
             "rule_name": "shared-services-pre-19",
             "rule_uuid": "ae1c6ab2-31db-21b4-5c4a-8fea98fbd986",
             "location": "DG-Shared-Services/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -4472,7 +4472,7 @@
             "rule_name": "partner-pre-08",
             "rule_uuid": "e79cf95e-6803-d90a-f680-f3409d81b0c2",
             "location": "DG-Partner/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -5108,7 +5108,7 @@
             "rule_name": "partner-pre-19",
             "rule_uuid": "8bdb46c9-3483-07f6-d211-6fb21de9591f",
             "location": "DG-Partner/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -5424,7 +5424,7 @@
             "rule_name": "shared-services-pre-01",
             "rule_uuid": "1b716e2d-25e6-d474-0afc-b6265996b447",
             "location": "DG-Shared-Services/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -5769,7 +5769,7 @@
             "rule_name": "shared-services-pre-06",
             "rule_uuid": "2687dc97-c0f6-40cd-d0fa-eb80fe061143",
             "location": "DG-Shared-Services/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -6096,7 +6096,7 @@
             "rule_name": "shared-services-pre-11",
             "rule_uuid": "35003324-1c4c-24c8-4d85-01b737e75f66",
             "location": "DG-Shared-Services/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -6418,7 +6418,7 @@
             "rule_name": "shared-services-pre-16",
             "rule_uuid": "8b945824-e3fe-e53f-867f-2b57a01522dc",
             "location": "DG-Shared-Services/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -6936,7 +6936,7 @@
             "rule_name": "development-pre-11",
             "rule_uuid": "bf5f3088-16fb-d8d3-a41a-45cf222af20e",
             "location": "DG-Development/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -7098,7 +7098,7 @@
             "rule_name": "partner-pre-01",
             "rule_uuid": "670d0a7a-4635-ae10-4bfc-562898a5bb45",
             "location": "DG-Partner/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -7436,7 +7436,7 @@
             "rule_name": "partner-pre-06",
             "rule_uuid": "dffac6e5-3114-d716-93f2-636f5f8fc492",
             "location": "DG-Partner/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -7763,7 +7763,7 @@
             "rule_name": "partner-pre-11",
             "rule_uuid": "b61314e3-a2a7-b3da-703e-7119fd3f1b28",
             "location": "DG-Partner/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -8078,7 +8078,7 @@
             "rule_name": "partner-pre-16",
             "rule_uuid": "a6b51508-379b-9a16-de62-45839f9f23a9",
             "location": "DG-Partner/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -8552,7 +8552,7 @@
             "rule_name": "partner-post-01",
             "rule_uuid": "cb20b4b9-c324-5c2a-28f8-8051966bfc1c",
             "location": "DG-Partner/post",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -8714,7 +8714,7 @@
             "rule_name": "shared-services-post-01",
             "rule_uuid": "40c1474e-afec-f99e-c8c6-a17713357476",
             "location": "DG-Shared-Services/post",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "platform"
@@ -9124,7 +9124,7 @@
             "rule_name": "dmz-pre-08",
             "rule_uuid": "4a5696f6-4a28-e066-21cd-656f1bb68f11",
             "location": "DG-DMZ/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -10069,7 +10069,7 @@
             "rule_name": "production-pre-08",
             "rule_uuid": "6832c520-d93c-208c-33ff-392dc46e25d9",
             "location": "DG-Production/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -11270,7 +11270,7 @@
             "rule_name": "development-pre-08",
             "rule_uuid": "4795b77d-3cc0-0154-53e1-8053f1476421",
             "location": "DG-Development/pre",
-            "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+            "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
             "recommendation": "Remove the rule, or extend it with a new change reference.",
             "teams": [
               "platform"
@@ -12459,7 +12459,7 @@
         "rule_name": "development-pre-08",
         "rule_uuid": "4795b77d-3cc0-0154-53e1-8053f1476421",
         "location": "DG-Development/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12472,7 +12472,7 @@
         "rule_name": "dmz-pre-08",
         "rule_uuid": "4a5696f6-4a28-e066-21cd-656f1bb68f11",
         "location": "DG-DMZ/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12485,7 +12485,7 @@
         "rule_name": "partner-pre-08",
         "rule_uuid": "e79cf95e-6803-d90a-f680-f3409d81b0c2",
         "location": "DG-Partner/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12498,7 +12498,7 @@
         "rule_name": "partner-pre-19",
         "rule_uuid": "8bdb46c9-3483-07f6-d211-6fb21de9591f",
         "location": "DG-Partner/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12511,7 +12511,7 @@
         "rule_name": "production-pre-08",
         "rule_uuid": "6832c520-d93c-208c-33ff-392dc46e25d9",
         "location": "DG-Production/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12524,7 +12524,7 @@
         "rule_name": "shared-services-pre-08",
         "rule_uuid": "e4b5ef1d-ee5a-41c9-93bb-4b9a676c9c8e",
         "location": "DG-Shared-Services/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12550,7 +12550,7 @@
         "rule_name": "shared-services-pre-19",
         "rule_uuid": "ae1c6ab2-31db-21b4-5c4a-8fea98fbd986",
         "location": "DG-Shared-Services/pre",
-        "detail": "The description gives an expiry of 2026-06-13, 47 days ago, but the rule is still active.",
+        "detail": "The description gives an expiry of 2026-06-13, 52 days ago, but the rule is still active.",
         "recommendation": "Remove the rule, or extend it with a new change reference.",
         "teams": [
           "platform"
@@ -12953,7 +12953,7 @@
         "rule_name": "development-pre-11",
         "rule_uuid": "bf5f3088-16fb-d8d3-a41a-45cf222af20e",
         "location": "DG-Development/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -12966,7 +12966,7 @@
         "rule_name": "development-pre-16",
         "rule_uuid": "8065412e-5053-2590-95ba-2e5684d8ab57",
         "location": "DG-Development/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13005,7 +13005,7 @@
         "rule_name": "dmz-pre-11",
         "rule_uuid": "26a59a54-6c37-0c6e-3165-72fb172b6f4b",
         "location": "DG-DMZ/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13018,7 +13018,7 @@
         "rule_name": "dmz-pre-16",
         "rule_uuid": "1befbcde-e32b-ca15-408b-9cba84d629ad",
         "location": "DG-DMZ/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13044,7 +13044,7 @@
         "rule_name": "partner-post-01",
         "rule_uuid": "cb20b4b9-c324-5c2a-28f8-8051966bfc1c",
         "location": "DG-Partner/post",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13057,7 +13057,7 @@
         "rule_name": "partner-pre-01",
         "rule_uuid": "670d0a7a-4635-ae10-4bfc-562898a5bb45",
         "location": "DG-Partner/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13083,7 +13083,7 @@
         "rule_name": "partner-pre-06",
         "rule_uuid": "dffac6e5-3114-d716-93f2-636f5f8fc492",
         "location": "DG-Partner/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13109,7 +13109,7 @@
         "rule_name": "partner-pre-11",
         "rule_uuid": "b61314e3-a2a7-b3da-703e-7119fd3f1b28",
         "location": "DG-Partner/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13135,7 +13135,7 @@
         "rule_name": "partner-pre-16",
         "rule_uuid": "a6b51508-379b-9a16-de62-45839f9f23a9",
         "location": "DG-Partner/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13174,7 +13174,7 @@
         "rule_name": "production-pre-11",
         "rule_uuid": "abf5638f-7603-7dfd-d61b-28f148ef395d",
         "location": "DG-Production/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13187,7 +13187,7 @@
         "rule_name": "production-pre-16",
         "rule_uuid": "f1897738-0bbb-799c-8025-ab0c4bad02cb",
         "location": "DG-Production/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13213,7 +13213,7 @@
         "rule_name": "shared-services-post-01",
         "rule_uuid": "40c1474e-afec-f99e-c8c6-a17713357476",
         "location": "DG-Shared-Services/post",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13226,7 +13226,7 @@
         "rule_name": "shared-services-pre-01",
         "rule_uuid": "1b716e2d-25e6-d474-0afc-b6265996b447",
         "location": "DG-Shared-Services/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13252,7 +13252,7 @@
         "rule_name": "shared-services-pre-06",
         "rule_uuid": "2687dc97-c0f6-40cd-d0fa-eb80fe061143",
         "location": "DG-Shared-Services/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13278,7 +13278,7 @@
         "rule_name": "shared-services-pre-11",
         "rule_uuid": "35003324-1c4c-24c8-4d85-01b737e75f66",
         "location": "DG-Shared-Services/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"
@@ -13304,7 +13304,7 @@
         "rule_name": "shared-services-pre-16",
         "rule_uuid": "8b945824-e3fe-e53f-867f-2b57a01522dc",
         "location": "DG-Shared-Services/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "platform"

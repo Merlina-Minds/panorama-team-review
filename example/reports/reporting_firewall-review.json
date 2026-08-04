@@ -5,14 +5,14 @@
       "example-estate.xml"
     ],
     "source_type": "panorama",
-    "file_mtime": "2026-07-30T19:26:01.773441",
-    "parsed_at": "2026-07-30T19:26:02.750276",
+    "file_mtime": "2026-08-04T22:41:04.400182",
+    "parsed_at": "2026-08-04T22:41:05.764384",
     "pan_os_version": "11.1.0",
     "hostname": "panorama.example.com",
     "tool_version": "0.1.0",
     "config_hash": "36184e5eb65b9931d22fc0f1f1b8a99e2765e85e8b3b009df8fb94a73e248e30"
   },
-  "generated_at": "2026-07-30T19:26:02.799649",
+  "generated_at": "2026-08-04T22:41:05.825758",
   "hitcount_available": false,
   "team": {
     "team": {
@@ -773,7 +773,7 @@
             "rule_name": "production-pre-06",
             "rule_uuid": "e8c796c8-e7af-d71d-a8ed-c658c4c8831e",
             "location": "DG-Production/pre",
-            "detail": "The stated expiry is 2026-08-27, in 28 days.",
+            "detail": "The stated expiry is 2026-08-27, in 23 days.",
             "recommendation": "Confirm whether the access is still needed before it lapses.",
             "teams": [
               "reporting"
@@ -2042,7 +2042,7 @@
         "rule_name": "production-pre-06",
         "rule_uuid": "e8c796c8-e7af-d71d-a8ed-c658c4c8831e",
         "location": "DG-Production/pre",
-        "detail": "The stated expiry is 2026-08-27, in 28 days.",
+        "detail": "The stated expiry is 2026-08-27, in 23 days.",
         "recommendation": "Confirm whether the access is still needed before it lapses.",
         "teams": [
           "reporting"

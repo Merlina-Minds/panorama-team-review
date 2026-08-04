@@ -1,0 +1,92 @@
+{% import "macros.html.j2" as m %}<!doctype html>
+<html lang="{{ config.report.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ config.report.title }} — Index</title>
+<style>{{ css }}</style>
+</head>
+<body>
+<a id="top"></a>
+
+<header class="report" id="page-header">
+  <div class="wrap">
+    <h1>{{ config.report.title }}</h1>
+    <div class="subject">Index of reports{% if config.report.organisation %} · {{ config.report.organisation }}{% endif %}</div>
+    <div class="provenance">
+      <span><b>Configuration:</b> {{ bundle.meta.backup_label }}{% if bundle.meta.document_count > 1 %} ({{ bundle.meta.document_count }} documents){% endif %}</span>
+      {% if bundle.meta.file_mtime %}<span><b>Backup from:</b> {{ bundle.meta.file_mtime.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+      <span><b>Generated:</b> {{ bundle.generated_at.strftime("%Y-%m-%d %H:%M") }}</span>
+      {% if bundle.meta.pan_os_version %}<span><b>PAN-OS:</b> {{ bundle.meta.pan_os_version }}</span>{% endif %}
+      <span><b>Tool:</b> panorama-team-review {{ bundle.meta.tool_version }}</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  {% if overview_href %}
+  <div class="tiles">
+    {{ m.tile(bundle.stats.get("rules_analysed", 0), "Rules analysed") }}
+    {{ m.tile(entries | length, "Team reports", "One HTML file each", "", "#s-teams") }}
+    {{ m.tile("Open", "Overview across all teams", "Every team on one page", "", overview_href) }}
+  </div>
+  {% endif %}
+
+  <section class="block" id="s-teams">
+    {{ m.section_heading("Team reports", entries | length, "teams") }}
+    <div class="collapsible" data-body="teams">
+      {% if entries %}
+      <p class="lede">
+        One report per team. <em>Own</em> counts the rules written for that team's address space —
+        the review workload; <em>Also covers</em> counts the estate-wide rules that include them
+        without being theirs. Open a team to see its rules, findings and evidence.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Team</th><th>Contact</th><th class="num">Networks</th>
+            <th class="num">Own total</th><th class="num">Also covers</th>
+            <th class="num">Findings</th><th>Worst</th>
+          </tr></thead>
+          <tbody>
+          {% for report, href in entries %}
+            <tr>
+              <td class="name"><a href="{{ href }}">{{ report.team.name }}</a><br><span class="pill mono">{{ report.team.id }}</span></td>
+              <td>{{ report.team.contact or "—" }}</td>
+              <td class="num">{{ report.team.assets | length }}</td>
+              <td class="num">{{ report.own_rule_count }}</td>
+              <td class="num">{{ report.covered_views | length }}</td>
+              <td class="num">{{ report.findings | length }}</td>
+              <td>
+                {%- set worst = report.findings | map(attribute="severity") | map(attribute="value") | list -%}
+                {%- if "high" in worst %}{{ m.severity_badge("high") }}
+                {%- elif "medium" in worst %}{{ m.severity_badge("medium") }}
+                {%- elif "low" in worst %}{{ m.severity_badge("low") }}
+                {%- elif worst %}{{ m.severity_badge("info") }}
+                {%- else %}<span class="pill">none</span>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="lede">No per-team HTML reports were written for this run.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if overview_href %}
+  <section class="block" id="s-overview">
+    {{ m.section_heading("Overview across all teams", "", "overview") }}
+    <p class="lede">
+      The firewall team's own view: every team on one page, plus the rules without an owner,
+      inventory gaps and all findings. <a href="{{ overview_href }}">Open the overview →</a>
+    </p>
+  </section>
+  {% endif %}
+
+</div>
+</body>
+</html>

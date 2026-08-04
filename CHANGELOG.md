@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **An `index.html` ties the HTML reports together.** Whenever HTML is written,
+  a run now also writes an `index.html` beside the reports: a table of contents
+  linking to each team's report and to the cross-team overview, with each team's
+  own-rule, covering-rule and finding counts. Opening the run's directory lands
+  on a page to click through rather than a bare file listing, which matters when
+  the reports are served over HTTP or dropped on a file share.
 - **Reports are rendered in parallel.** Turning the analysed estate into files
   is CPU-bound and, on a large estate, is the bulk of a run — every team's
   HTML, Excel, PDF and JSON, plus the cross-team overview, is an independent

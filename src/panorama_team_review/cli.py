@@ -38,7 +38,7 @@ from .errors import (
 from .model import OutputFormat, ReportBundle, Snapshot, TeamReport
 from .parse import panos
 from .parse.loader import find_backups, load
-from .report import batch, pdf
+from .report import batch, html, pdf
 from .report import build as report_build
 from .resolve.inventory import load_inventory
 
@@ -309,10 +309,18 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
     position = {id(report): index for index, report in enumerate(bundle.teams)}
     jobs: list[batch.Job] = []
 
+    # An index.html links the HTML reports together, so opening the run's
+    # directory lands on a table of contents rather than a file listing.
+    want_index = "html" in formats
+    index_entries: list[tuple[TeamReport, str]] = []
+    overview_href: str | None = None
+
     if config.output.combined:
         stem = config.output.combined_filename_template.format(date=stamp)
         for fmt in active:
             jobs.append((batch.COMBINED, fmt, directory / f"{stem}.{fmt}"))
+        if want_index:
+            overview_href = f"{stem}.html"
 
     if config.output.per_team:
         for report in per_team:
@@ -321,6 +329,8 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
             )
             for fmt in active:
                 jobs.append((position[id(report)], fmt, directory / f"{stem}.{fmt}"))
+            if want_index:
+                index_entries.append((report, f"{stem}.html"))
 
     if not jobs:
         return []
@@ -336,7 +346,14 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
         if done == count or done % 25 == 0:
             ctx.step(f"  rendered {done}/{count} file(s)")
 
-    return batch.write_all(bundle, jobs, config, progress=report_progress)
+    written = batch.write_all(bundle, jobs, config, progress=report_progress)
+
+    if want_index and (index_entries or overview_href):
+        written.append(
+            html.write_index(bundle, config, directory / "index.html", index_entries, overview_href)
+        )
+
+    return written
 
 
 def _sample_teams(reports: list[TeamReport], count: int) -> list[TeamReport]:
