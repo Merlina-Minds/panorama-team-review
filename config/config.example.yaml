@@ -76,7 +76,8 @@ output:
   # html  -- self-contained, searchable, clickable ticket links. What owners use.
   # xlsx  -- the working format: owners fill in Decision and Comment and send it back.
   # pdf   -- the audit artefact, frozen per date. Requires the [pdf] extra.
-  # json  -- complete machine-readable record; input to `pan-review diff`.
+  # json  -- complete machine-readable record, written gzipped as .json.gz;
+  #          input to `pan-review diff`, which reads the compression directly.
   formats: [html, xlsx, pdf, json]
 
   per_team: true       # one file per team

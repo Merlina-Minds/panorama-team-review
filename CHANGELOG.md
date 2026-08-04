@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **JSON reports are written gzip-compressed, as `.json.gz`.** The complete
+  record repeats every rule once per team that sees it, so on a large estate the
+  plain text ran to hundreds of megabytes; gzip shrinks it roughly tenfold.
+  `pan-review diff` reads the compression directly, and older plain-`.json`
+  reports still load, so existing baselines keep working.
 - **Usage is shown for the rules that also cover a team, and reads as an age.**
   The "Rules that also cover your networks" section now carries the same usage
   column as a team's own rules -- knowing an estate-wide rule is heavily used or

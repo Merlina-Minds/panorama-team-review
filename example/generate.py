@@ -68,10 +68,10 @@ def main() -> int:
         return result.returncode
 
     # The cross-team JSON repeats every rule once per team that sees it, which
-    # on this estate runs past the repository's own large-file limit. It is the
-    # same schema as the per-team JSON beside it -- a reader loses nothing by
-    # its absence, and a real run still writes it.
-    oversized = REPORTS / "00_OVERVIEW_all-teams.json"
+    # on this estate runs past the repository's own large-file limit even
+    # gzipped. It is the same schema as the per-team JSON beside it -- a reader
+    # loses nothing by its absence, and a real run still writes it.
+    oversized = REPORTS / "00_OVERVIEW_all-teams.json.gz"
     if oversized.exists():
         oversized.unlink()
         print(f"dropped {oversized.name}: too large to commit, same schema as the per-team JSON")

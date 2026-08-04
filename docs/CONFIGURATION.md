@@ -215,6 +215,12 @@ the reports — a table of contents linking to every team's report and the
 cross-team overview, so opening the run's directory lands on a page to click
 through rather than a bare file listing.
 
+JSON output is written gzip-compressed, as `.json.gz`: the complete record
+repeats every rule once per team that sees it, so on a large estate it runs to
+hundreds of megabytes uncompressed and shrinks roughly tenfold. `pan-review
+diff` reads the compression directly, and older plain-`.json` reports still
+load.
+
 ### Rendering speed
 
 Turning the analysed estate into files is CPU-bound and, on a large estate with

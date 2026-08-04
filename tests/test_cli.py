@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,11 @@ from panorama_team_review.config import Config, OutputConfig
 # among a hundred team reports, and a test hard-coding it drifts the moment it
 # is made more distinct again.
 OVERVIEW_MARK = OutputConfig().combined_filename_template.format(date="").strip("_")
+
+
+def _report_text(path: Path) -> str:
+    """The decompressed text of a gzipped ``.json.gz`` report."""
+    return gzip.decompress(path.read_bytes()).decode("utf-8")
 
 
 @pytest.fixture
@@ -120,7 +126,7 @@ def test_validate_states_that_hit_counts_are_off(runner, estate):
 def test_run_produces_reports(runner, estate):
     result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
     assert result.exit_code == EXIT_OK
-    written = sorted(p.name for p in (estate / "reports").glob("*.json"))
+    written = sorted(p.name for p in (estate / "reports").glob("*.json.gz"))
     assert any("platform" in name for name in written)
     assert any(OVERVIEW_MARK in name for name in written)
 
@@ -161,7 +167,7 @@ def test_run_format_override(runner, estate):
     )
     assert result.exit_code == EXIT_OK
     assert list((estate / "reports").glob("*.html"))
-    assert not list((estate / "reports").glob("*.json"))
+    assert not list((estate / "reports").glob("*.json.gz"))
 
 
 def test_run_writes_an_html_index(runner, estate):
@@ -188,7 +194,7 @@ def test_run_output_override(runner, estate, tmp_path):
         main, ["-c", str(estate / "config.yaml"), "run", "-o", str(target)]
     )
     assert result.exit_code == EXIT_OK
-    assert list(target.glob("*.json"))
+    assert list(target.glob("*.json.gz"))
 
 
 def test_run_team_filter(runner, estate):
@@ -196,7 +202,7 @@ def test_run_team_filter(runner, estate):
         main, ["-c", str(estate / "config.yaml"), "run", "--team", "platform"]
     )
     assert result.exit_code == EXIT_OK
-    names = [p.name for p in (estate / "reports").glob("*.json")]
+    names = [p.name for p in (estate / "reports").glob("*.json.gz")]
     assert not any("payments" in name for name in names)
 
 
@@ -206,7 +212,7 @@ def test_run_sample_limits_the_number_of_team_reports(runner, estate):
     )
     assert result.exit_code == EXIT_OK
     team_reports = [
-        p for p in (estate / "reports").glob("*.json") if OVERVIEW_MARK not in p.name
+        p for p in (estate / "reports").glob("*.json.gz") if OVERVIEW_MARK not in p.name
     ]
     assert len(team_reports) == 1
     assert "Sampling 1 of" in result.output
@@ -218,8 +224,8 @@ def test_run_sample_leaves_the_overview_complete(runner, estate):
         main, ["-c", str(estate / "config.yaml"), "run", "--sample", "1"]
     )
     assert result.exit_code == EXIT_OK
-    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json"))
-    assert len(json.loads(overview.read_text())["teams"]) == 2
+    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json.gz"))
+    assert len(json.loads(_report_text(overview))["teams"]) == 2
 
 
 def test_sample_prefers_teams_that_have_rules_to_review():
@@ -311,8 +317,8 @@ def test_run_as_of_changes_expiry_evaluation(runner, estate):
     runner.invoke(
         main, ["-c", str(estate / "config.yaml"), "run", "--as-of", "2020-01-01"]
     )
-    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json"))
-    data = json.loads(overview.read_text(encoding="utf-8"))
+    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json.gz"))
+    data = json.loads(_report_text(overview))
     assert data["stats"].get("check_EXPIRED_RULE", 0) == 0
 
 
@@ -328,7 +334,7 @@ def test_run_creates_a_timestamped_directory(runner, estate):
     assert result.exit_code == EXIT_OK
     subdirs = [p for p in (estate / "reports").iterdir() if p.is_dir()]
     assert len(subdirs) == 1
-    assert list(subdirs[0].glob("*.json"))
+    assert list(subdirs[0].glob("*.json.gz"))
 
 
 def test_run_timestamped_subdir_format_can_include_a_time(runner, estate):
@@ -421,7 +427,7 @@ def test_generated_example_inventory_is_valid(runner, tmp_path):
 
 def test_diff_reports_no_change_for_identical_input(runner, estate):
     runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
-    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json"))
+    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json.gz"))
     result = runner.invoke(main, ["diff", str(overview), str(overview)])
     assert result.exit_code == EXIT_OK
     assert "No rule changes" in result.output
@@ -431,9 +437,9 @@ def test_diff_detects_changes(runner, estate, panorama_xml, tmp_path):
     from lxml import etree
 
     runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
-    first = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json"))
-    baseline = tmp_path / "baseline.json"
-    baseline.write_text(first.read_text(encoding="utf-8"), encoding="utf-8")
+    first = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json.gz"))
+    baseline = tmp_path / "baseline.json.gz"
+    baseline.write_bytes(first.read_bytes())
 
     tree = etree.fromstring(panorama_xml.encode("utf-8"))
     rule = tree.find(".//device-group/entry/pre-rulebase/security/rules/entry")
@@ -442,7 +448,7 @@ def test_diff_detects_changes(runner, estate, panorama_xml, tmp_path):
     modified.write_bytes(etree.tostring(tree))
 
     runner.invoke(main, ["-c", str(estate / "config.yaml"), "run", "--backup", str(modified)])
-    second = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json"))
+    second = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json.gz"))
 
     result = runner.invoke(main, ["diff", str(baseline), str(second)])
     assert result.exit_code == EXIT_OK
@@ -452,7 +458,7 @@ def test_diff_detects_changes(runner, estate, panorama_xml, tmp_path):
 
 def test_diff_json_output(runner, estate):
     runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
-    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json"))
+    overview = next((estate / "reports").glob(f"*{OVERVIEW_MARK}*.json.gz"))
     result = runner.invoke(main, ["diff", str(overview), str(overview), "--json"])
     data = json.loads(result.output)
     assert data["summary"] == {"added": 0, "removed": 0, "changed": 0}
@@ -747,10 +753,10 @@ def test_separate_estates_stay_isolated(runner, tmp_path, panorama_xml, firewall
     assert runner.invoke(main, ["-c", str(second), "run"]).exit_code == EXIT_OK
 
     a_text = "\n".join(
-        p.read_text(encoding="utf-8") for p in (tmp_path / "estate-a" / "reports").glob("*.json")
+        _report_text(p) for p in (tmp_path / "estate-a" / "reports").glob("*.json.gz")
     )
     b_text = "\n".join(
-        p.read_text(encoding="utf-8") for p in (tmp_path / "estate-b" / "reports").glob("*.json")
+        _report_text(p) for p in (tmp_path / "estate-b" / "reports").glob("*.json.gz")
     )
 
     assert "estate-b" not in a_text
@@ -762,8 +768,8 @@ def test_separate_estates_stay_isolated(runner, tmp_path, panorama_xml, firewall
 def test_estate_output_stays_in_its_own_directory(runner, tmp_path, panorama_xml):
     config = make_estate(tmp_path, "estate-a", panorama_xml, "10.10.0.0/16")
     runner.invoke(main, ["-c", str(config), "run"])
-    assert list((tmp_path / "estate-a" / "reports").glob("*.json"))
-    assert not list(tmp_path.glob("*.json"))
+    assert list((tmp_path / "estate-a" / "reports").glob("*.json.gz"))
+    assert not list(tmp_path.glob("*.json.gz"))
 
 
 def test_resolver_state_does_not_leak_between_runs(panorama_snapshot, panorama_file):

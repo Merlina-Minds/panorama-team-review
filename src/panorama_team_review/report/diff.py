@@ -11,6 +11,7 @@ rule's UUID stable across renames, and by location plus name otherwise.
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -89,9 +90,13 @@ COMPARED_FIELDS = [
 def load_bundle(path: Path) -> dict:
     if not path.is_file():
         raise PanReviewError(f"report not found: {path}")
+    raw = path.read_bytes()
+    # Reports are written gzipped (.json.gz); older plain-JSON files still load.
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
+        data = json.loads(raw.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise PanReviewError(f"{path}: not valid JSON: {exc}") from exc
     if "teams" not in data and "team" not in data:
         raise PanReviewError(

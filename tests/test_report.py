@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import zipfile
 from datetime import date
@@ -208,8 +209,8 @@ def test_build_is_deterministic(panorama_file, teams, config):
 
 
 def test_json_bundle_round_trips(bundle, tmp_path):
-    path = json_report.write_bundle(bundle, tmp_path / "bundle.json")
-    data = json.loads(path.read_text(encoding="utf-8"))
+    path = json_report.write_bundle(bundle, tmp_path / "bundle.json.gz")
+    data = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
     assert data["meta"]["source_type"] == "panorama"
     assert len(data["teams"]) == len(bundle.teams)
     assert "generated_at" in data
@@ -217,15 +218,16 @@ def test_json_bundle_round_trips(bundle, tmp_path):
 
 def test_json_team_slice_stands_alone(bundle, tmp_path):
     report = bundle.teams[0]
-    path = json_report.write_team(bundle, report, tmp_path / "team.json")
-    data = json.loads(path.read_text(encoding="utf-8"))
+    path = json_report.write_team(bundle, report, tmp_path / "team.json.gz")
+    data = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
     assert data["team"]["team"]["id"] == report.team.id
     assert "meta" in data and "generated_at" in data
 
 
 def test_json_is_utf8_and_not_escaped(bundle, tmp_path):
-    path = json_report.write_bundle(bundle, tmp_path / "b.json")
-    assert "\\u" not in path.read_text(encoding="utf-8")[:5000]
+    path = json_report.write_bundle(bundle, tmp_path / "b.json.gz")
+    text = gzip.decompress(path.read_bytes()).decode("utf-8")
+    assert "\\u" not in text[:5000]
 
 
 # ---------------------------------------------------------------------------

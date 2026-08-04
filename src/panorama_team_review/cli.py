@@ -47,6 +47,9 @@ EXIT_ERROR = 1
 EXIT_CONFIG = 2
 EXIT_NO_BACKUP = 3
 
+# File extension per output format; only JSON differs, since it is gzipped.
+_EXTENSIONS = {"json": "json.gz"}
+
 
 class Context:
     def __init__(self, config: Config, config_path: Path | None, quiet: bool, verbose: bool):
@@ -304,7 +307,7 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
     # are handed to the batch writer, which renders them across worker processes
     # when the volume justifies it. Heavy formats and the combined document come
     # first so they start on the first free workers instead of tailing the run,
-    # and the file extension matches the format name.
+    # and the file extension matches the format name (JSON is written gzipped).
     active = [fmt for fmt in ("xlsx", "pdf", "html", "json") if fmt in formats]
     position = {id(report): index for index, report in enumerate(bundle.teams)}
     jobs: list[batch.Job] = []
@@ -318,7 +321,7 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
     if config.output.combined:
         stem = config.output.combined_filename_template.format(date=stamp)
         for fmt in active:
-            jobs.append((batch.COMBINED, fmt, directory / f"{stem}.{fmt}"))
+            jobs.append((batch.COMBINED, fmt, directory / f"{stem}.{_EXTENSIONS.get(fmt, fmt)}"))
         if want_index:
             overview_href = f"{stem}.html"
 
@@ -328,7 +331,9 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
                 date=stamp, team_id=_safe(report.team.id), team_name=_safe(report.team.name)
             )
             for fmt in active:
-                jobs.append((position[id(report)], fmt, directory / f"{stem}.{fmt}"))
+                jobs.append(
+                    (position[id(report)], fmt, directory / f"{stem}.{_EXTENSIONS.get(fmt, fmt)}")
+                )
             if want_index:
                 index_entries.append((report, f"{stem}.html"))
 

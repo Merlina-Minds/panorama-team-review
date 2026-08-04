@@ -135,11 +135,11 @@ jobs:
           test -n "$(find e2e/reports -name '*.html' -print -quit)"
           test -n "$(find e2e/reports -name '*.xlsx' -print -quit)"
           test -n "$(find e2e/reports -name '*.pdf'  -print -quit)"
-          test -n "$(find e2e/reports -name '*.json' -print -quit)"
+          test -n "$(find e2e/reports -name '*.json.gz' -print -quit)"
 
           # A report must be reproducible: the same input twice, same output.
           pan-review -c e2e/config.yaml run -o ./reports-again -f json
-          pan-review diff e2e/reports/*overview.json e2e/reports-again/*overview.json \
+          pan-review diff e2e/reports/*overview.json.gz e2e/reports-again/*overview.json.gz \
             --fail-on-change
 
       - name: Confirm the run made no network connections
