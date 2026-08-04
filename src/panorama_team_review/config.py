@@ -421,6 +421,16 @@ class OwnershipConfig(ConfigModel):
     )
     tag_case_sensitive: bool = False
 
+    # An ownership tag on an *object* says more than the same tag on a rule: the
+    # object's addresses are the team's assets, so tagging carries the same
+    # information the inventory does, and directionally (source vs destination),
+    # which a rule tag cannot. With this on, an address object or group carrying
+    # an ownership tag contributes its addresses to that team as if the
+    # inventory had listed them -- extending a hand-written inventory, or
+    # replacing it. Only tags matching tag_prefixes/tag_suffixes count; every
+    # other tag is a classification and is ignored.
+    derive_from_object_tags: bool = False
+
     # -- regex resolver
     name_patterns: list[str] = Field(
         default_factory=list,

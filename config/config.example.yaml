@@ -149,6 +149,16 @@ ownership:
   tag_suffixes: []
   tag_case_sensitive: false
 
+  # An ownership tag on an *object* is stronger than the same tag on a rule: the
+  # object's addresses are the team's assets, so the tag carries what the
+  # inventory carries -- and directionally, which a rule tag cannot. With this
+  # on, an address object or group tagged (say) 'owner:payments' contributes its
+  # addresses to team 'payments' as if inventory.yaml had listed them. Only tags
+  # matching tag_prefixes/tag_suffixes count; classifications are ignored. This
+  # extends a hand-written inventory, or -- on an estate that tags consistently
+  # -- can replace it. Off by default.
+  derive_from_object_tags: false
+
   # Global patterns applied to every rule name. Must capture a group named
   # 'team' whose value is a team id from the inventory.
   # Per-team patterns can also be set in the inventory itself.

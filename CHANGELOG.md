@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Ownership can come from tags on the objects, not just the inventory.** With
+  `ownership.derive_from_object_tags`, an address object or group tagged with the
+  ownership convention (`owner:payments`, using the existing
+  `tag_prefixes`/`tag_suffixes`) contributes its addresses to that team as if the
+  inventory had listed them. Because an object sits on a definite side of a rule,
+  this carries direction — inbound/outbound — which a tag on a *rule* cannot, so
+  it feeds the inventory resolver rather than the flat "related" section. Only
+  convention-shaped tags count; every other tag stays a classification and is
+  ignored. It merges with `teams_file` (an explicit entry wins, the addresses
+  fold in), so it extends a hand-written inventory or, on an estate that tags
+  consistently, replaces it — keeping ownership in Panorama next to the objects
+  instead of in a parallel list that drifts. Off by default.
 - **An `index.html` ties the HTML reports together.** Whenever HTML is written,
   a run now also writes an `index.html` beside the reports: a table of contents
   linking to each team's report and to the cross-team overview, with each team's

@@ -63,6 +63,16 @@ def build_report(
         notes.extend(derivation.notes)
         notes.extend(merge_notes)
 
+    # 1c. Assets from ownership tags on the objects themselves. Same merge rule:
+    # a tag extends a hand-written inventory, or stands in for it.
+    if config.ownership.derive_from_object_tags:
+        from ..resolve.derive import derive_from_object_tags, merge_teams
+
+        tagged = derive_from_object_tags(snapshot, index, config.ownership)
+        teams, tag_notes = merge_teams(list(teams), tagged.teams)
+        notes.extend(tagged.notes)
+        notes.extend(tag_notes)
+
     # 2. Recover tickets, dates and requesters from free text.
     extractor = MetadataExtractor(config.metadata)
     annotate_rules(snapshot.rules, extractor)

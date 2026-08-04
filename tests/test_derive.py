@@ -23,7 +23,7 @@ from panorama_team_review.model import (
     SnapshotMeta,
     Team,
 )
-from panorama_team_review.resolve.derive import derive_teams, merge_teams
+from panorama_team_review.resolve.derive import derive_from_object_tags, derive_teams, merge_teams
 from panorama_team_review.resolve.objects import build_index
 
 
@@ -456,3 +456,112 @@ def test_without_a_convention_nothing_is_inherited():
     """An estate that does not tag for ownership inherits nothing, correctly."""
     team = _derive_with_tags(["owner:shop"], tag_prefixes=[], tag_suffixes=[])
     assert team.tags == []
+
+
+# ---------------------------------------------------------------------------
+# Assets from ownership tags on the objects themselves
+# ---------------------------------------------------------------------------
+
+
+def _from_object_tags(snap, prefixes=("owner:",), suffixes=()):
+    config = OwnershipConfig(tag_prefixes=list(prefixes), tag_suffixes=list(suffixes))
+    return derive_from_object_tags(snap, build_index(snap), config)
+
+
+def test_a_tagged_object_becomes_a_team_asset():
+    """The whole point: the object's address is the team's, as if the inventory said so."""
+    snap = snapshot(addresses=[address("db01", "10.20.0.0/24", tags=["owner:payments"])])
+    teams = _from_object_tags(snap).teams
+    assert [t.id for t in teams] == ["payments"]
+    assert teams[0].assets == ["10.20.0.0/24"]
+
+
+def test_a_tagged_group_contributes_its_members():
+    snap = snapshot(
+        addresses=[address("web01", "10.1.1.0/24"), address("web02", "10.1.2.0/24")],
+        address_groups=[
+            AddressGroup(name="grp-web", members=["web01", "web02"],
+                         tags=["owner:platform"], location=loc())
+        ],
+    )
+    teams = _from_object_tags(snap).teams
+    assert [t.id for t in teams] == ["platform"]
+    assert set(teams[0].assets) == {"10.1.1.0/24", "10.1.2.0/24"}
+
+
+def test_classification_tags_derive_nothing():
+    """Only tags matching the convention count; the rest say what the object is."""
+    snap = snapshot(
+        addresses=[address("db01", "10.20.0.0/24", tags=["prod", "GlobalProtect-Clients"])]
+    )
+    assert _from_object_tags(snap).teams == []
+
+
+def test_the_suffix_convention_derives_assets_too():
+    snap = snapshot(addresses=[address("db01", "10.20.0.0/24", tags=["payments-owner"])])
+    teams = _from_object_tags(snap, prefixes=(), suffixes=("-owner",)).teams
+    assert [t.id for t in teams] == ["payments"]
+
+
+def test_one_object_can_belong_to_two_teams():
+    snap = snapshot(
+        addresses=[address("shared", "10.5.0.0/24", tags=["owner:payments", "owner:platform"])]
+    )
+    assert {t.id for t in _from_object_tags(snap).teams} == {"payments", "platform"}
+
+
+def test_placeholder_networks_are_excluded_from_derived_assets():
+    """A loopback standing in for 'nothing here yet' must not become an asset."""
+    snap = snapshot(addresses=[address("db01", "127.0.0.1/32", tags=["owner:payments"])])
+    assert _from_object_tags(snap).teams == []
+
+
+def test_object_tags_give_direction_through_the_builder():
+    """Object tags feed the inventory resolver, so they carry inbound/outbound."""
+    from datetime import datetime
+
+    from panorama_team_review.config import Config
+    from panorama_team_review.model import ResolvedAddresses, SecurityRule
+    from panorama_team_review.report.build import build_report
+
+    snap = snapshot(
+        addresses=[
+            address("a-host", "10.1.1.0/24", tags=["owner:alpha"]),
+            address("b-host", "10.2.2.0/24", tags=["owner:beta"]),
+        ],
+        rules=[
+            SecurityRule(
+                name="alpha-to-beta",
+                location=Location(source="t.xml", device_group="DG"),
+                source=ResolvedAddresses(raw=["a-host"]),
+                destination=ResolvedAddresses(raw=["b-host"]),
+            )
+        ],
+    )
+    snap.meta.parsed_at = datetime(2026, 7, 28)
+
+    config = Config()
+    config.ownership.derive_from_object_tags = True
+    bundle = build_report(snap, [], config)
+
+    by_id = {report.team.id: report for report in bundle.teams}
+    assert [v.rule.name for v in by_id["alpha"].outbound] == ["alpha-to-beta"]
+    assert [v.rule.name for v in by_id["beta"].inbound] == ["alpha-to-beta"]
+
+
+def test_object_tags_extend_a_hand_written_inventory():
+    """A tag adds assets to an inventory team rather than replacing it."""
+    from panorama_team_review.config import Config
+    from panorama_team_review.report.build import build_report
+
+    snap = snapshot(addresses=[address("db01", "10.20.0.0/24", tags=["owner:payments"])])
+
+    config = Config()
+    config.ownership.derive_from_object_tags = True
+    explicit = [Team(id="payments", name="Payments", assets=["10.99.0.0/16"])]
+    bundle = build_report(snap, explicit, config)
+
+    payments = next(report for report in bundle.teams if report.team.id == "payments")
+    assert payments.team.name == "Payments"  # the explicit entry still wins
+    assert set(payments.team.assets) == {"10.99.0.0/16", "10.20.0.0/24"}
+

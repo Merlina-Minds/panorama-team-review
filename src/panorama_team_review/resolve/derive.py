@@ -24,7 +24,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from ..config import DerivedTeamRule, OwnershipConfig
+from ..config import DEFAULT_EXCLUDED_ASSET_NETWORKS, DerivedTeamRule, OwnershipConfig
 from ..model import Snapshot, Team
 from .objects import ObjectIndex, resolve_addresses
 from .objects import ResolvedAddresses as _ResolvedAddresses  # noqa: F401
@@ -64,11 +64,87 @@ def derive_teams(
                 f"producing {len(collected) - before} new team(s)"
             )
 
+    result.teams = _teams_from(collected)
+    return result
+
+
+def derive_from_object_tags(
+    snapshot: Snapshot, index: ObjectIndex, config: OwnershipConfig
+) -> DerivationResult:
+    """Turn ownership tags on address objects and groups into team assets.
+
+    An ownership tag on an object -- one matching ``tag_prefixes`` or
+    ``tag_suffixes`` and naming a team -- means the object's addresses belong to
+    that team, exactly as if the inventory had listed them. Every other tag is a
+    classification (what the object is, which dynamic groups it falls into) and
+    is ignored, which is what keeps a single ``prod`` tag on hundreds of objects
+    from claiming rules for the wrong team. The result is merged with the
+    inventory the same way derived teams are, so this extends a hand-written
+    inventory or, on an estate that tags consistently, replaces it.
+    """
+    result = DerivationResult()
+    collected: dict[str, _Accumulator] = {}
+
+    for address in snapshot.addresses:
+        teams = _owner_teams(address.tags, config)
+        if not teams:
+            continue
+        networks = _networks_of(address)
+        for team_id in teams:
+            acc = _tag_accumulator(team_id, collected)
+            acc.sources.add(f"tagged object {address.name!r}")
+            for net in networks:
+                acc.add(net, address.description or address.name)
+
+    for group in snapshot.address_groups:
+        teams = _owner_teams(group.tags, config)
+        if not teams:
+            continue
+        resolved = resolve_addresses(_shell(group.name), group.location, index)
+        for team_id in teams:
+            acc = _tag_accumulator(team_id, collected)
+            acc.sources.add(f"tagged group {group.name!r}")
+            for cidr in resolved.networks:
+                acc.add(ipaddress.ip_network(cidr), group.name)
+
+    result.teams = _teams_from(collected)
+    return result
+
+
+def _owner_teams(tags: list[str], config: OwnershipConfig) -> list[str]:
+    """The team ids named by an object's ownership tags, in order, deduplicated."""
+    seen: dict[str, None] = {}
+    for tag in tags:
+        team_id = ownership_tag_team(tag, config)
+        if team_id:
+            seen.setdefault(team_id, None)
+    return list(seen)
+
+
+def _tag_accumulator(team_id: str, collected: dict[str, _Accumulator]) -> _Accumulator:
+    """Fetch or create the accumulator for a team named by an object tag."""
+    acc = collected.get(team_id)
+    if acc is None:
+        acc = _Accumulator(
+            team_id=team_id,
+            name=team_id,
+            excluded=tuple(
+                ipaddress.ip_network(n, strict=False)
+                for n in DEFAULT_EXCLUDED_ASSET_NETWORKS
+            ),
+        )
+        collected[team_id] = acc
+    return acc
+
+
+def _teams_from(collected: dict[str, _Accumulator]) -> list[Team]:
+    """Build the team objects for every accumulator that cleared its threshold."""
+    teams: list[Team] = []
     for team_id, acc in sorted(collected.items()):
         if len(acc.networks) < acc.min_assets:
             continue
         networks = _collapse(acc.networks)
-        result.teams.append(
+        teams.append(
             Team(
                 id=team_id,
                 name=acc.name or team_id,
@@ -79,8 +155,7 @@ def derive_teams(
                 tags=sorted(acc.tags),
             )
         )
-
-    return result
+    return teams
 
 
 @dataclass

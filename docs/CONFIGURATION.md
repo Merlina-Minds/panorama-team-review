@@ -283,6 +283,7 @@ ownership:
   tag_prefixes: ["owner:", "team:"]
   tag_suffixes: []
   tag_case_sensitive: false
+  derive_from_object_tags: false
   name_patterns: []
   description_patterns: []
   match_mode: overlap
@@ -372,6 +373,43 @@ silently dropped:
 `pan-review validate` lists the configured rules, and every run reports how many
 objects each matched — a rule that matched nothing says so instead of quietly
 producing no teams.
+
+### `derive_from_object_tags` — assets from ownership tags on objects
+
+An ownership tag on an *object* says more than the same tag on a rule. A rule
+tag lands in the team's non-directional "related" section, because a tag on a
+rule cannot say which side of the connection the team is on. An address object,
+though, is on a definite side — so a tag on it carries the same information the
+inventory does, direction included.
+
+With `derive_from_object_tags: true`, every address object and address group
+carrying a tag that matches `tag_prefixes`/`tag_suffixes` contributes its
+addresses to the named team, exactly as if `teams_file` had listed them:
+
+```yaml
+ownership:
+  tag_prefixes: ["owner:"]
+  derive_from_object_tags: true
+```
+
+```
+address object  db-payments-01   10.20.0.0/24   tag: owner:payments
+   ->  team 'payments' gains the asset 10.20.0.0/24, directionally
+```
+
+Only tags shaped like the ownership convention count; every other tag is a
+classification (`prod`, `GlobalProtect-Clients`, a dynamic-group filter tag) and
+is ignored — which is what keeps a single tag on hundreds of objects from
+claiming rules for the wrong team. An object can carry more than one ownership
+tag and then belongs to each named team.
+
+The result is merged with `teams_file` the same way derived teams are: an
+explicit entry wins, but the tagged addresses are folded into it. So this
+**extends** a hand-written inventory, or — on an estate that tags consistently
+— **replaces** it, which is the point: the ownership lives in Panorama, next to
+the objects, and the report reads it directly rather than from a parallel list
+that drifts. The same placeholder addresses `derive_teams` skips are skipped
+here too. Off by default.
 
 ### `name_patterns` and `description_patterns`
 

@@ -575,8 +575,8 @@ def validate(ctx: Context) -> None:
                     )
         except ConfigError as exc:
             problems.append(str(exc))
-    elif config.ownership.derive_teams:
-        click.echo("Inventory:     not configured (teams come from derive_teams)")
+    elif config.ownership.derive_teams or config.ownership.derive_from_object_tags:
+        click.echo("Inventory:     not configured (teams come from tags/derive_teams)")
     else:
         click.echo("Inventory:     not configured (all rules will be unassigned)")
 
@@ -584,6 +584,15 @@ def validate(ctx: Context) -> None:
         click.echo(f"Derived teams: {len(config.ownership.derive_teams)} rule(s):")
         for derive_rule in config.ownership.derive_teams:
             click.echo(f"               {derive_rule.id} <- {derive_rule.source}")
+
+    if config.ownership.derive_from_object_tags:
+        markers = ", ".join(config.ownership.tag_prefixes + config.ownership.tag_suffixes) or "none"
+        click.echo(f"Object tags:   assets derived from tags matching: {markers}")
+        if not (config.ownership.tag_prefixes or config.ownership.tag_suffixes):
+            problems.append(
+                "ownership.derive_from_object_tags is on but no tag_prefixes or tag_suffixes "
+                "are set -- no tag can name a team, so no assets are derived"
+            )
 
     if config.input.backup_dir:
         if config.input.backup_dir.is_dir():
