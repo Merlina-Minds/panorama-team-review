@@ -308,7 +308,7 @@ a silently omitted EDL understates a system's exposure.
 | **HTML** | What owners actually use. One self-contained file, no external requests, searchable, collapsible sections, a jump bar, severity filters, per-rule detail, clickable ticket links. Opens fine on an air-gapped management host. |
 | **Excel** | The working format. Owners fill in the *Decision* (keep / remove / modify / unclear) and *Comment* columns and send the workbook back. One sheet per direction for the team's own rules, one for the rules that merely cover them — that one without a Decision column. Every row carries the object names a change request has to cite. |
 | **PDF** | The audit artefact: frozen per date, with the configuration checksum on the cover page. |
-| **JSON** | The complete machine-readable record, written gzipped (`.json.gz`). Input to `pan-review diff`, and a feed for a CMDB or ticket system. |
+| **JSON** | The complete machine-readable record, written gzipped (`.json.gz`). Carries the same own/covering split as the other formats: the direction lists are the team's own rules, a `covered` object holds the rest. Input to `pan-review diff`, and a feed for a CMDB or ticket system. |
 
 ## Tickets and dates in rule descriptions
 

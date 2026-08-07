@@ -68,6 +68,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The JSON report now separates a team's own rules from the ones that merely
+  cover them.** `inbound`, `outbound`, `internal` and `related` held both kinds
+  mixed together, told apart only by each entry's `coverage` field, while the
+  HTML and Excel reports had always shown them as separate tables and sheets.
+  A reader iterating `inbound` therefore got the team's review workload with
+  every estate-wide rule mixed in, and — unless it knew to filter — presented
+  central rules as though the team had requested them. The direction lists now
+  hold the own rules, and a new `covered` object holds the covering ones under
+  those same four keys, in evaluation order. Nothing is dropped, and every
+  entry still carries its `coverage` and `coverage_reason`. `pan-review diff`
+  compares both kinds, as before, and still reads reports written in the old
+  shape.
 - **The PDF and Excel reports now order the address columns by direction, like
   the HTML report.** On the inbound sheets and tables the far side comes before
   a team's own networks, so every row reads left to right in the direction the

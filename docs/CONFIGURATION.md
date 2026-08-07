@@ -221,6 +221,14 @@ hundreds of megabytes uncompressed and shrinks roughly tenfold. `pan-review
 diff` reads the compression directly, and older plain-`.json` reports still
 load.
 
+Within a team, `inbound`, `outbound`, `internal` and `related` hold the rules
+that are the team's own — the ones the report asks them to decide on — and a
+`covered` object holds the rules that merely cover them, under those same four
+keys. It is the split the HTML and Excel reports show as separate tables and
+sheets, so a reader that iterates `inbound` gets the review workload and not
+the estate-wide rules alongside it. Each rule still carries its `coverage` and
+`coverage_reason`.
+
 ### Rendering speed
 
 Turning the analysed estate into files is CPU-bound and, on a large estate with

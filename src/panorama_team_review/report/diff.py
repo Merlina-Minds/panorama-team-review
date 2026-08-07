@@ -151,6 +151,12 @@ def _collect_rules(bundle: dict) -> dict[str, dict]:
 
     A rule appears once per team it was attributed to, so the same rule is
     present several times in one bundle; the diff needs each rule once.
+
+    Both a team's own rules and the ones that merely cover it are taken. This
+    diff is between two backups, not between two review workloads: a changed
+    estate-wide rule is a change whether or not anyone is being asked about it.
+    ``covered`` is read from its own key and, for reports written before that
+    key existed, from the direction lists it used to be mixed into.
     """
     rules: dict[str, dict] = {}
 
@@ -161,8 +167,11 @@ def _collect_rules(bundle: dict) -> dict[str, dict]:
 
     teams = bundle.get("teams") or ([bundle["team"]] if "team" in bundle else [])
     for team in teams:
+        covered = team.get("covered") or {}
         for section in ("inbound", "outbound", "internal", "related"):
             for view in team.get(section, []):
+                take(view)
+            for view in covered.get(section, []):
                 take(view)
 
     for view in bundle.get("unassigned", []):

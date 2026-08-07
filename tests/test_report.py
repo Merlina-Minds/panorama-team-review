@@ -11,7 +11,7 @@ import pytest
 
 from panorama_team_review.config import Config, OutputConfig, ReportConfig
 from panorama_team_review.model import AddressMember, ResolvedAddresses
-from panorama_team_review.report import excel, html, json_report, pdf
+from panorama_team_review.report import diff, excel, html, json_report, pdf
 from panorama_team_review.report import format as fmt
 from panorama_team_review.report.build import build_report
 
@@ -228,6 +228,91 @@ def test_json_is_utf8_and_not_escaped(bundle, tmp_path):
     path = json_report.write_bundle(bundle, tmp_path / "b.json.gz")
     text = gzip.decompress(path.read_bytes()).decode("utf-8")
     assert "\\u" not in text[:5000]
+
+
+def _team_payload(bundle, report, tmp_path, name="team.json.gz"):
+    path = json_report.write_team(bundle, report, tmp_path / name)
+    return json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
+
+
+def _most_covered(bundle):
+    report = max(bundle.teams, key=lambda r: len(r.covered_views))
+    if not report.covered_views:
+        pytest.skip("no covering rules in this fixture")
+    return report
+
+
+def test_json_separates_covering_rules_from_the_teams_own(bundle, tmp_path):
+    """Like the HTML and Excel reports do: a reader iterating ``inbound`` must not
+    be handed estate-wide rules as though the team had asked for them."""
+    report = _most_covered(bundle)
+    team = _team_payload(bundle, report, tmp_path)["team"]
+
+    for direction in json_report.DIRECTIONS:
+        own, covered = team[direction], team["covered"][direction]
+        assert [v["coverage"] for v in own] == ["own"] * len(own)
+        assert [v["coverage"] for v in covered] == ["covered"] * len(covered)
+        assert len(own) == len(report.own(direction))
+        assert len(covered) == len(report.covered(direction))
+    assert any(team["covered"][d] for d in json_report.DIRECTIONS)
+
+
+def test_json_covering_rules_keep_their_direction(bundle, tmp_path):
+    """Split by direction, not into one block: 'who may reach me' and 'what may my
+    systems reach' stay different questions when the rule was written centrally."""
+    report = _most_covered(bundle)
+    team = _team_payload(bundle, report, tmp_path)["team"]
+    for direction in json_report.DIRECTIONS:
+        for view in team["covered"][direction]:
+            assert view["direction"] == direction
+
+
+def test_json_covering_rules_come_in_evaluation_order(bundle, tmp_path):
+    report = _most_covered(bundle)
+    team = _team_payload(bundle, report, tmp_path)["team"]
+    for direction in json_report.DIRECTIONS:
+        ranks = [v["evaluation_rank"] for v in team["covered"][direction]]
+        assert ranks == sorted(ranks)
+
+
+def test_json_split_loses_no_rules(bundle, tmp_path):
+    """Separating the two is a regrouping, not a filter."""
+    path = json_report.write_bundle(bundle, tmp_path / "bundle.json.gz")
+    data = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
+    for payload, report in zip(data["teams"], bundle.teams, strict=True):
+        written = sum(
+            len(payload[d]) + len(payload["covered"][d]) for d in json_report.DIRECTIONS
+        )
+        assert written == report.rule_count
+
+
+def test_diff_still_sees_a_rule_that_only_covers_a_team(bundle, tmp_path):
+    """The diff is between two backups, not two review workloads: a changed
+    estate-wide rule is a change even though nobody is asked to decide on it."""
+    report = _most_covered(bundle)
+    old = _team_payload(bundle, report, tmp_path)
+    new = _team_payload(bundle, report, tmp_path)
+
+    view = next(v for d in json_report.DIRECTIONS for v in new["team"]["covered"][d])
+    view["rule"]["action"] = "deny" if view["rule"]["action"] != "deny" else "allow"
+
+    changed = diff.diff_bundles(old, new).changed
+    assert [c.name for c in changed] == [view["rule"]["name"]]
+
+
+def test_diff_still_reads_reports_written_before_the_split(bundle, tmp_path):
+    """Older reports mixed both kinds into the direction lists and have no
+    ``covered`` key; they must keep diffing."""
+    report = _most_covered(bundle)
+    new = _team_payload(bundle, report, tmp_path)
+
+    legacy = _team_payload(bundle, report, tmp_path)
+    covered = legacy["team"].pop("covered")
+    for direction in json_report.DIRECTIONS:
+        legacy["team"][direction] += covered[direction]
+
+    assert diff.diff_bundles(legacy, new).changed == []
+    assert diff.diff_bundles(legacy, new).removed == []
 
 
 # ---------------------------------------------------------------------------
