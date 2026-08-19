@@ -21,6 +21,18 @@ def write(path: Path, content: str) -> Path:
     return path
 
 
+def absolute(*parts: str) -> Path:
+    """An absolute path on whichever platform the suite is running on.
+
+    A POSIX-rooted path like ``/tmp`` is not absolute on Windows -- it carries
+    no drive -- so the loader resolves it against the current one, and a test
+    that hardcodes the POSIX spelling fails there for a reason that has nothing
+    to do with the behaviour under test. Anchoring on the working directory's
+    root keeps these tests about absoluteness itself.
+    """
+    return Path(Path.cwd().anchor, *parts)
+
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -39,8 +51,9 @@ def test_hit_counts_are_off_by_default():
 
 
 def test_minimal_config_loads(tmp_path):
-    path = write(tmp_path / "c.yaml", "input:\n  backup_dir: /tmp\n")
-    assert load_config(path).input.backup_dir == Path("/tmp")
+    backup_dir = absolute("tmp")
+    path = write(tmp_path / "c.yaml", f"input:\n  backup_dir: {backup_dir.as_posix()}\n")
+    assert load_config(path).input.backup_dir == backup_dir
 
 
 def test_empty_config_file_loads(tmp_path):
@@ -114,8 +127,9 @@ def test_relative_paths_resolve_against_the_config_file(tmp_path):
 
 
 def test_absolute_paths_are_left_alone(tmp_path):
-    path = write(tmp_path / "c.yaml", "output:\n  directory: /var/reports\n")
-    assert load_config(path).output.directory == Path("/var/reports")
+    directory = absolute("var", "reports")
+    path = write(tmp_path / "c.yaml", f"output:\n  directory: {directory.as_posix()}\n")
+    assert load_config(path).output.directory == directory
 
 
 def test_credential_and_asset_paths_resolve_against_the_config_file(tmp_path):

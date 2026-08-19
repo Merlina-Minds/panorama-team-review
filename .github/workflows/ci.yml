@@ -20,10 +20,10 @@ jobs:
     name: No customer data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Scan the whole tree
@@ -52,15 +52,39 @@ jobs:
             python: "3.14"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+      # `python-version` points UV_PYTHON at the matrix interpreter and
+      # `activate-environment` puts a matching .venv on PATH, so every later
+      # step runs on the version this job claims to test. Installing with
+      # `--system` instead targets the runner image's own Python, which is how
+      # this matrix spent its entire history testing 3.12 six times over.
+      #
+      # v7 is the newest *floating* major tag this action publishes; v8 and
+      # later exist only as exact patch tags, and pinning one of those would
+      # need renewing on every release. Dependabot bumps this in step.
+      - name: Set up uv and Python ${{ matrix.python }}
+        uses: astral-sh/setup-uv@v7
         with:
+          python-version: ${{ matrix.python }}
+          activate-environment: true
           enable-cache: true
+          # The project pins nothing, so pyproject.toml is the only sensible
+          # cache key. Naming it explicitly also keeps the action from hunting
+          # for a uv.lock this repo will never have.
+          cache-dependency-glob: pyproject.toml
 
-      - name: Set up Python
-        run: uv python install ${{ matrix.python }}
+      - name: Confirm the interpreter is the one this job is named after
+        # A silent fall back to the runner's Python is exactly the failure this
+        # matrix hid for its whole life. Assert it instead.
+        run: |
+          got=$(python -c "import sys; print('%d.%d' % sys.version_info[:2])")
+          if [ "$got" != "${{ matrix.python }}" ]; then
+            echo "::error::wanted Python ${{ matrix.python }}, got $got"
+            exit 1
+          fi
+          python -VV
+        shell: bash
 
       - name: Install PDF system libraries
         if: runner.os == 'Linux'
@@ -74,9 +98,9 @@ jobs:
         # a user without the libraries should get.
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
-            uv pip install --system -e ".[dev,pdf,api]"
+            uv pip install -e ".[dev,pdf,api]"
           else
-            uv pip install --system -e ".[dev,api]"
+            uv pip install -e ".[dev,api]"
           fi
         shell: bash
 
@@ -87,10 +111,14 @@ jobs:
     name: Lint and types
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv python install 3.12
-      - run: uv pip install --system -e ".[dev,api]"
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - run: uv pip install -e ".[dev,api]"
       - name: ruff
         run: ruff check src tests tools
       - name: mypy
@@ -100,17 +128,25 @@ jobs:
     name: End-to-end run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv python install 3.12
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          activate-environment: true
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
       - run: |
           sudo apt-get update
           sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libcairo2
-      - run: uv pip install --system -e ".[dev,pdf]"
+      - run: uv pip install -e ".[dev,pdf]"
 
       - name: Generate a synthetic estate and produce every report format
         run: |
           set -euo pipefail
+          # Without this a glob that stops matching -- a renamed report, a new
+          # extension -- is passed through as a literal string and surfaces as
+          # a confusing "file does not exist" from the tool. Fail on the glob.
+          shopt -s failglob
           mkdir -p e2e/backups
           python -c "
           import sys; sys.path.insert(0, 'tests')
@@ -138,8 +174,17 @@ jobs:
           test -n "$(find e2e/reports -name '*.json.gz' -print -quit)"
 
           # A report must be reproducible: the same input twice, same output.
-          pan-review -c e2e/config.yaml run -o ./reports-again -f json
-          pan-review diff e2e/reports/*overview.json.gz e2e/reports-again/*overview.json.gz \
+          # The overview's name comes from the output.overview_name default,
+          # which spells the word in capitals.
+          #
+          # -o is a command-line argument, so it is relative to the working
+          # directory -- unlike output.directory in the config file, which
+          # deliberately resolves against the config. Passing ./reports-again
+          # here wrote into the workspace root while the diff below looked
+          # under e2e/, so it could never have matched.
+          pan-review -c e2e/config.yaml run -o e2e/reports-again -f json
+          pan-review diff e2e/reports/*OVERVIEW*.json.gz \
+            e2e/reports-again/*OVERVIEW*.json.gz \
             --fail-on-change
 
       - name: Confirm the run made no network connections
@@ -148,6 +193,6 @@ jobs:
           # that it works offline; if anything reaches out, this fails.
           sudo iptables -I OUTPUT -m owner --uid-owner "$(id -u)" -d 0.0.0.0/0 \
             ! -o lo -j REJECT || true
-          pan-review -c e2e/config.yaml run -o ./reports-offline -f json
+          pan-review -c e2e/config.yaml run -o e2e/reports-offline -f json
           sudo iptables -D OUTPUT -m owner --uid-owner "$(id -u)" -d 0.0.0.0/0 \
             ! -o lo -j REJECT || true
