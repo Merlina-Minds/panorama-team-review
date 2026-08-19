@@ -35,7 +35,7 @@ jobs:
         run: pre-commit run --all-files
         continue-on-error: true
 
-      - uses: peter-evans/create-pull-request@v6
+      - uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "ci: bump pre-commit hook revisions"
           branch: chore/pre-commit-autoupdate
