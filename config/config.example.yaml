@@ -369,6 +369,13 @@ hitcounts:
   # username: readonly-api
   # password_env: PAN_PASSWORD
   # password_file: /etc/panorama-team-review/api.pass
+  #
+  # 3) Neither, for an interactive test -- while you are working on the
+  #    inventory, use your own account without storing its password anywhere:
+  #      pan-review -c config.yaml login
+  #    It asks once, trades the password for an API key via the same read-only
+  #    keygen call, and keeps only the key: readable by you alone, gone after a
+  #    few hours, or immediately with  pan-review logout.
 
   verify_tls: true
   # Management interfaces often use a self-signed or internal-CA certificate,

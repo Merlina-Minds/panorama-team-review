@@ -16,6 +16,7 @@ backups", which are very different alerts.
 
 from __future__ import annotations
 
+import getpass
 import math
 import shutil
 import sys
@@ -26,7 +27,7 @@ from typing import cast
 
 import click
 
-from . import __version__
+from . import __version__, keystore
 from .analyze.findings import available_checks
 from .config import Config, ConnectionConfig, load_config
 from .errors import (
@@ -680,6 +681,17 @@ def _check_connection(conn: ConnectionConfig, problems: list[str]) -> None:
         method = f"API key from ${conn.api_key_env} (must be set at run time)"
     click.echo(f"Credentials:   {method}")
 
+    try:
+        session = keystore.load()
+    except PanReviewError as exc:
+        problems.append(str(exc))
+    else:
+        if session is not None:
+            click.echo(
+                f"Session:       key for {len(session.keys)} device(s) as "
+                f"{session.username!r}, {keystore.describe_remaining(session.remaining)} left"
+            )
+
     for label, path_value, allow_empty in (
         ("hitcounts.api_key_file", conn.api_key_file, False),
         ("hitcounts.password_file", conn.password_file, False),
@@ -868,6 +880,81 @@ def fetch_cert(ctx: Context, devices: tuple[str, ...], output: Path | None) -> N
     click.echo(f"\nWrote {len(pems)} certificate(s) to {out_path}")
     click.echo("Verify the fingerprint(s) above against the device, then set in the config:")
     click.echo(f"  hitcounts:\n    ca_bundle: {out_path}")
+
+
+@main.command()
+@click.argument("devices", nargs=-1)
+@click.option(
+    "--username", "-u",
+    help="Administrator to authenticate as. Defaults to hitcounts.username, else your login name.",
+)
+@click.option(
+    "--hours", type=click.IntRange(1, keystore.MAX_TTL_HOURS),
+    default=keystore.DEFAULT_TTL_HOURS, show_default=True,
+    help="How long the key stays usable on this machine.",
+)
+@click.pass_obj
+def login(ctx: Context, devices: tuple[str, ...], username: str | None, hours: int) -> None:
+    """Exchange a password for a short-lived API key, for interactive testing.
+
+    A scheduled run should authenticate as a dedicated read-only service
+    account whose key lives in a file. Trying the tool out while editing the
+    inventory is the other case: it is you at a terminal, and putting your own
+    password -- possibly your directory password -- into a file or an
+    environment variable to do it is not a reasonable price.
+
+    This asks for the password once, exchanges it for an API key through the
+    device's read-only keygen call, and stores only the key, readable by you
+    alone and ignored after HOURS. The password is never written anywhere.
+
+    DEVICES defaults to the hosts in `hitcounts.devices`.
+    """
+    conn = ctx.config.hitcounts
+    targets = list(devices) or conn.devices
+    if not targets:
+        click.echo(
+            "error: no devices given and hitcounts.devices is empty -- pass one or more "
+            "hostnames, or list them in the configuration.",
+            err=True,
+        )
+        sys.exit(EXIT_CONFIG)
+
+    user = username or conn.username or getpass.getuser()
+    # Prompted on stderr so `pan-review login` stays usable with stdout piped.
+    password = click.prompt(f"Password for {user}", hide_input=True, err=True)
+
+    from . import panos_api
+
+    keys: dict[str, str] = {}
+    try:
+        http = panos_api.open_session(conn)
+        for device in targets:
+            ctx.step(f"{device}: obtaining an API key…")
+            keys[device] = panos_api.keygen(http, device, user, password, conn)
+    except PanReviewError as exc:
+        click.echo(f"error: {exc}", err=True)
+        sys.exit(EXIT_ERROR)
+    finally:
+        del password
+
+    session = keystore.store(user, keys, hours)
+    local = session.expires_at.astimezone()
+    click.echo(f"stored {len(keys)} API key(s) for {user!r} in {keystore.session_path()}")
+    click.echo(f"used by this machine until {local:%Y-%m-%d %H:%M %Z}, then ignored.")
+    click.echo(
+        "The password was not written anywhere. The key stays valid on the device itself "
+        "until expired there; 'pan-review logout' drops this copy."
+    )
+
+
+@main.command()
+def logout() -> None:
+    """Discard the API key stored by `pan-review login`."""
+    path = keystore.session_path()
+    if keystore.clear():
+        click.echo(f"removed {path}")
+    else:
+        click.echo("no stored session")
 
 
 @main.command("suggest-inventory")

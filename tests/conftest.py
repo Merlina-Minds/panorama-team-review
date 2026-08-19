@@ -30,6 +30,18 @@ from panorama_team_review.parse.loader import load  # noqa: E402
 REFERENCE_DATE = date(2026, 7, 28)
 
 
+@pytest.fixture(autouse=True)
+def isolated_keystore(tmp_path: Path, monkeypatch) -> None:
+    """Never read or write the developer's own ``pan-review login`` session.
+
+    ``keystore`` resolves its path from the environment, so pointing both XDG
+    directories at the test's tmp directory keeps every credential test
+    independent of whoever logged in on the machine running the suite.
+    """
+    monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+
+
 @pytest.fixture(scope="session")
 def options() -> GeneratorOptions:
     return GeneratorOptions()

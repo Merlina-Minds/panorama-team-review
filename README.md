@@ -446,6 +446,40 @@ hitcounts:
   password_env: PAN_PASSWORD   # the password never does
 ```
 
+### Testing with your own account
+
+That arrangement is right for a scheduled run. It is the wrong shape for the
+other case: you, at a terminal, working on the inventory and running the tool
+against a real device over and over. Doing that with the service account means
+handing its key around; doing it with your own account means writing your
+personal password — in an AD-backed setup, *the* password — into a file or an
+environment variable, to try something out.
+
+`pan-review login` removes the reason to:
+
+```console
+$ pan-review -c config.yaml login
+Password for m.mustermann:
+stored 1 API key(s) for 'm.mustermann' in /run/user/1000/panorama-team-review/session.json
+used by this machine until 2026-08-19 23:41 CEST, then ignored.
+```
+
+The password is exchanged for an API key through the device's read-only
+`keygen` call and then dropped — only the key is written, in a file only you
+can read, and only until it expires (`--hours`, 8 by default, 24 at most).
+`run`, `collect-hitcounts` and `fetch-backup` then pick it up on their own for
+the devices it covers, so nothing in the configuration has to change and no
+secret has to be set for the run. `pan-review logout` ends it early.
+
+Where `$XDG_RUNTIME_DIR` exists the file sits on a tmpfs the system wipes at
+logout, so the key never reaches a disk; otherwise it falls back to
+`~/.local/state/`, where the expiry recorded in the file is what limits it.
+That expiry is local: it stops *this machine* using the key, and does not
+revoke it on the device — `request api-key expire` does that.
+
+An explicitly configured key always wins, so a service account's setup behaves
+exactly as before whether or not anyone has logged in.
+
 If the management interface uses a self-signed or internal-CA certificate,
 verification fails with `CERTIFICATE_VERIFY_FAILED`. Point `hitcounts.ca_bundle`
 at that certificate rather than disabling verification with `verify_tls: false`
@@ -536,6 +570,8 @@ pan-review suggest-inventory  Derive a draft inventory from a configuration.
 pan-review collect-hitcounts  Refresh the hit-count cache (network access).
 pan-review fetch-backup       Pull the running configuration from the devices (network access).
 pan-review fetch-cert         Fetch a device's TLS certificate into a CA bundle (network access).
+pan-review login              Trade a password for a short-lived API key, for testing (network access).
+pan-review logout             Discard that key.
 pan-review scrub SRC DST      Pseudonymise a configuration for a bug report.
 ```
 

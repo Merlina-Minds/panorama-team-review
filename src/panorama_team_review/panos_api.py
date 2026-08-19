@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from lxml import etree
 
+from . import keystore
 from .errors import EnrichmentError, FetchError
 
 if TYPE_CHECKING:
@@ -104,42 +105,58 @@ def missing_credentials(config: ConnectionConfig) -> str | None:
     has_key = bool(config.api_key_file) or bool(os.environ.get(config.api_key_env, "").strip())
     if has_key or config.username:
         return None
+    if keystore.load() is not None:
+        return None
     return (
         f"no credentials: set an API key (the {config.api_key_env} environment variable or "
         f"api_key_file), or a username plus password (username in the config, and the "
         f"{config.password_env} environment variable or password_file). "
-        "Secrets are never read from the configuration file itself."
+        "Secrets are never read from the configuration file itself. "
+        "To try the tool out against a device without storing anything, "
+        "'pan-review login' asks for the password once and keeps only a short-lived key."
     )
 
 
 def authenticate(session: Any, device: str, config: ConnectionConfig) -> str:
     """Return a usable API key for ``device``.
 
-    An explicit key is used as-is for every device. Otherwise, a username and
-    password obtain a key from the device via a read-only ``keygen`` call --
-    the path for a read-only account that was never issued a key.
+    An explicit key is used as-is for every device. Failing that, a key stored
+    by ``pan-review login`` is used while it lasts -- the interactive case,
+    where the password was exchanged for a key once and deliberately not kept.
+    Otherwise, a username and password obtain a key from the device via a
+    read-only ``keygen`` call, which is the path for a read-only account that
+    was never issued a key.
     """
     key = _explicit_api_key(config)
     if key:
         return key
+
+    if stored := keystore.key_for(device, config.username):
+        return stored
 
     if config.username:
         password = _resolve_password(config)
         if not password:
             raise EnrichmentError(
                 f"username {config.username!r} is set but no password: set the "
-                f"{config.password_env} environment variable, or point password_file at a "
-                "file containing it. Passwords are never read from the configuration file."
+                f"{config.password_env} environment variable, point password_file at a file "
+                "containing it, or run 'pan-review login' to exchange it for a short-lived "
+                "key. Passwords are never read from the configuration file."
             )
-        return _keygen(session, device, config.username, password, config)
+        return keygen(session, device, config.username, password, config)
 
     raise EnrichmentError(missing_credentials(config) or "no credentials configured")
 
 
-def _keygen(
+def keygen(
     session: Any, device: str, username: str, password: str, config: ConnectionConfig
 ) -> str:
-    """Exchange a username and password for an API key (read-only)."""
+    """Exchange a username and password for an API key.
+
+    Read-only by construction: ``keygen`` returns a credential and changes
+    nothing on the device. Public because ``pan-review login`` performs exactly
+    this exchange, then keeps the key and discards the password.
+    """
     root = _parse(
         device,
         _post(session, device, {"type": "keygen", "user": username, "password": password}, config),

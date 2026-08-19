@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`pan-review login` — a short-lived API key instead of a stored password.**
+  A scheduled run should authenticate as a dedicated read-only service account
+  whose key sits in a file; working *on* the inventory or the configuration is
+  the other case, and it previously had the same two options, so trying
+  something out against a real device meant putting a personal password — an AD
+  password, at worst — into a file or an environment variable. `login` asks for
+  it once, exchanges it for an API key through the device's read-only `keygen`
+  call, and keeps only the key: in `$XDG_RUNTIME_DIR` where there is one (a
+  tmpfs the system wipes at logout, so it never reaches a disk), otherwise under
+  `~/.local/state/`, mode `0600`, and ignored after `--hours` (8 by default, 24
+  at most). `run`, `collect-hitcounts` and `fetch-backup` use it automatically
+  for the devices it covers, so no configuration changes and no secret has to be
+  set for the run; `pan-review logout` ends it early. A configured key still
+  wins, leaving service-account setups untouched. The expiry is local and does
+  not revoke the key on the device.
+
 - **Ownership can come from tags on the objects, not just the inventory.** With
   `ownership.derive_from_object_tags`, an address object or group tagged with the
   ownership convention (`owner:payments`, using the existing

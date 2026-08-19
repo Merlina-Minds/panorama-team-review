@@ -43,7 +43,7 @@ of an organisation's network segmentation.
 | Path traversal from archive members | Only in-memory reads; nothing is extracted to disk |
 | Malicious rule names or descriptions reaching a report | Jinja autoescaping on for all data; only the tool's own stylesheets bypass it. Tested in `test_html_escapes_rule_content`. |
 | Unintended device modification | Both network features are read-only: every operational command is checked to start with `show` before it is sent (including the ones Panorama proxies to a managed firewall via `target`), and configuration fetch only ever requests `type=export&category=configuration`. Password authentication uses only a `keygen` credential exchange |
-| Credential exposure | API keys and passwords are read from an environment variable or a file, never from the configuration file; only the username, which is not a secret, may live there. `config/config.yaml` is gitignored |
+| Credential exposure | API keys and passwords are read from an environment variable or a file, never from the configuration file; only the username, which is not a secret, may live there. `config/config.yaml` is gitignored. An interactive test needs neither: `pan-review login` exchanges a password for an API key through the read-only `keygen` call and stores only the key, in a mode-`0600` file that expires after at most 24 hours |
 | Unintended network access | Network code lives only in `panos_api.py` (shared transport) and its two callers `enrich/hitcount.py` and `fetch.py`, all disabled by default; CI verifies a full run completes with outbound traffic blocked |
 
 ### What it does not protect against
@@ -72,6 +72,11 @@ of an organisation's network segmentation.
   disabled unless you need them. If you enable either, use an account bound to a
   **read-only administrator role**, and supply its secret (API key or password)
   through the environment or a mode-`0600` file — never in the configuration.
+- Give a scheduled run a **dedicated service account**, not a person's. For
+  working on the configuration interactively, use `pan-review login` rather than
+  putting a personal password anywhere: it stores an expiring API key and never
+  the password, and that key carries only the account's read-only rights and can
+  be revoked on the device (`request api-key expire`) without a password change.
 - Restrict access to the output directory. Reports are as sensitive as the
   configuration they describe.
 - Set `input.max_age_days` so a broken backup job fails loudly rather than
