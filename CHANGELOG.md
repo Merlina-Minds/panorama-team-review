@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The overview answers "which team owns this network?".** A ticket arrives
+  with an address in it, and the only way to turn that into an owner was to read
+  a table of every team. The cross-team overview now takes an address or a CIDR
+  and lists every team whose inventory meets it -- exactly this network, the
+  network that contains it, or, for a wide mask, every team that falls inside
+  it, which is the honest answer to who has to be asked about a `/16` spanning
+  eight accounts. It answers in the page, from the inventory embedded in it, so
+  it works with the file opened from disk on a management host, and each hit
+  opens that team's report. IPv6 counts as an address like any other.
+
+- **The reports link to each other.** A team's report now offers the same report
+  as PDF, Excel and JSON, and the overview opens any team's report -- in any
+  format the run wrote -- from the team table. Which files exist is decided once
+  per run and handed to every renderer, so nothing links to a PDF that was never
+  rendered or to a team `--sample` left out. A team's report links to its own
+  formats and to nothing else: it is forwarded on its own, and a link to the
+  cross-team overview would either be dead or show its recipient every other
+  team's rules.
+
+- **An `index.html` above the dated runs, so the reports directory can be
+  published as it is.** With `timestamped_subdir`, the directory somebody points
+  a web server at holds nothing but dated run directories -- served as a file
+  listing, or a 403. It now gets a front door of its own: the newest run's
+  overview as the way in, and every run `keep_runs` still holds underneath it,
+  rewritten after each run and after pruning so it never links to a directory
+  that has just been removed.
+
 - **`pan-review login` — a short-lived API key instead of a stored password.**
   A scheduled run should authenticate as a dedicated read-only service account
   whose key sits in a file; working *on* the inventory or the configuration is
@@ -143,6 +170,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   not checked, since the secret is supplied at run time by design.
 
 ### Changed
+
+- **An inventory gap names the object its team's networks were read from.** The
+  check reported that a name and the inventory disagree, and left the reader to
+  work out what to edit -- which on an estate deriving its teams from address
+  groups is not the inventory file at all, but a group in the firewall
+  configuration that is missing a member. Each row now carries that source, in
+  the overview and in the workbook, next to the networks the team does have.
+
+- **The run's `index.html` is written whatever the formats are.** It was tied to
+  HTML output, on the reasoning that it is a table of contents for the HTML
+  reports. It is the entry point of the directory -- the file a web server
+  serves for the folder -- so a run that produced only spreadsheets needs one
+  too, and it links to the spreadsheets.
 
 - **JSON reports are written gzip-compressed, as `.json.gz`.** The complete
   record repeats every rule once per team that sees it, so on a large estate the

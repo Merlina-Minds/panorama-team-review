@@ -141,6 +141,7 @@ header.report.compact { padding: 0.5rem 0 0.4rem; }
 header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
 header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
 header.report.compact .provenance { display: none; }
+header.report.compact .siblings { display: none; }
 header.report.compact nav.jump { margin-top: 0.35rem; }
 
 .provenance {
@@ -152,6 +153,42 @@ header.report.compact nav.jump { margin-top: 0.35rem; }
 }
 
 .provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- the same document, in its other formats ----------------------------- */
+
+/* One review is four files: a page, a PDF, a workbook, a JSON record. The links
+ * between them are deliberately quiet -- small outlined pills under the title,
+ * never a toolbar. Nobody opens a report in order to change its format; they do
+ * it afterwards, to forward what they just read. */
+
+.siblings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.formats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.formats-label { font-size: 0.78rem; color: var(--ink-muted); }
+
+a.format {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+a.format:hover { border-color: var(--link); color: var(--link); }
 
 /* --- jump navigation ----------------------------------------------------- */
 
@@ -293,6 +330,12 @@ a.tile:hover .tile-go { color: var(--accent); }
 
 .controls .spacer { flex: 1 1 auto; }
 .controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* The address lookup answers into this. It is empty until something is typed:
+ * an empty result table under an empty box reads as "no team owns anything". */
+.lookup-results:empty { display: none; }
+.lookup-results { margin-top: 0.75rem; }
+.lookup-results .lede { margin: 0.25rem 0 0; }
 
 /* --- parts -------------------------------------------------------------- */
 
@@ -702,11 +745,18 @@ h3.gap-head {
     <div class="subject">Overview across all teams · Example Corp</div>
     <div class="provenance">
       <span><b>Configuration:</b> example-estate.xml</span>
-<span><b>Backup from:</b> 2026-08-07 16:09</span>      <span><b>Generated:</b> 2026-08-07 16:09</span>
+<span><b>Backup from:</b> 2026-08-26 23:14</span>      <span><b>Generated:</b> 2026-08-26 23:14</span>
 <span><b>PAN-OS:</b> 11.1.0</span>      <span><b>Tool:</b> panorama-team-review 0.1.0</span>
     </div>
 
+    <div class="siblings">
+      <a class="format" href="index.html">Index of this run</a>
+      <span class="formats"><span class="formats-label">This overview as</span><a class="format" href="00_OVERVIEW_all-teams.pdf">PDF</a><a class="format" href="00_OVERVIEW_all-teams.xlsx">Excel</a><a class="format" href="00_OVERVIEW_all-teams.json.gz">JSON</a></span>
+
+    </div>
+
     <nav class="jump" aria-label="Sections of this report">
+      <a href="#s-lookup">Find a network</a>
       <a href="#s-teams">Teams</a>
 <a href="#s-scopes">Policy blocks</a><a href="#s-unassigned">Rules without an owner</a><a href="#s-findings">All findings</a>      <a href="#s-stats">Statistics</a>
     </nav>
@@ -752,6 +802,36 @@ h3.gap-head {
     <ul><li>asset 10.20.1.7/32 of team &#39;reporting&#39; overlaps 10.20.0.0/16 of team &#39;payments&#39;</li></ul>
   </div>
 
+  <section class="block" id="s-lookup">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="lookup" aria-expanded="true"
+          aria-controls="s-lookup" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Which team owns a network?</span>
+  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="lookup">
+      <p class="lede">
+        Type an address or a CIDR — <span class="mono">10.243.48.0/25</span>, or a single host —
+        and every team whose inventory meets it is listed. A wider mask meets more of them, and
+        all are shown: a <span class="mono">/16</span> spanning eight accounts names eight teams,
+        which is the honest answer to who has to be asked.
+      </p>
+      <div class="controls">
+        <input type="search" id="net-lookup" autocomplete="off" spellcheck="false"
+               placeholder="10.243.48.0/25 · 10.243.48.17 · 2001:db8:1::/48"
+               aria-label="Find the team a network belongs to">
+        <button id="net-clear">Clear</button>
+        <span class="spacer"></span>
+        <span class="count" id="net-count"></span>
+      </div>
+      <div id="net-results" class="lookup-results" aria-live="polite"
+           data-unassigned="#s-unassigned"></div>
+    </div>
+  </section>
+
   <section class="block" id="s-teams">
     <h2 class="section-head">
   <button class="collapse" data-collapse="teams" aria-expanded="true"
@@ -777,10 +857,13 @@ h3.gap-head {
             <th class="num">Inbound</th><th class="num">Outbound</th><th class="num">Both ends</th>
             <th class="num">No direction</th><th class="num">Own total</th>
             <th class="num">Also covers</th><th class="num">Findings</th><th>Worst</th>
+            <th>Report</th>
           </tr></thead>
           <tbody>
             <tr>
-              <td class="name">Platform Services<br><span class="pill mono">platform</span></td>
+              <td class="name">
+<a href="platform_firewall-review.html">Platform Services</a>                <br><span class="pill mono">platform</span>
+              </td>
               <td>platform@example.com</td>
               <td class="num">2</td>
               <td class="num">15</td>
@@ -791,9 +874,13 @@ h3.gap-head {
               <td class="num">9</td>
               <td class="num">67</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="platform_firewall-review.html">HTML</a><a class="format" href="platform_firewall-review.pdf">PDF</a><a class="format" href="platform_firewall-review.xlsx">Excel</a><a class="format" href="platform_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name">Payments Platform<br><span class="pill mono">payments</span></td>
+              <td class="name">
+<a href="payments_firewall-review.html">Payments Platform</a>                <br><span class="pill mono">payments</span>
+              </td>
               <td>payments@example.com</td>
               <td class="num">2</td>
               <td class="num">3</td>
@@ -804,9 +891,13 @@ h3.gap-head {
               <td class="num">5</td>
               <td class="num">61</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="payments_firewall-review.html">HTML</a><a class="format" href="payments_firewall-review.pdf">PDF</a><a class="format" href="payments_firewall-review.xlsx">Excel</a><a class="format" href="payments_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name">DMZ Operations<br><span class="pill mono">dmz</span></td>
+              <td class="name">
+<a href="dmz_firewall-review.html">DMZ Operations</a>                <br><span class="pill mono">dmz</span>
+              </td>
               <td>dmz@example.com</td>
               <td class="num">1</td>
               <td class="num">3</td>
@@ -817,9 +908,13 @@ h3.gap-head {
               <td class="num">10</td>
               <td class="num">18</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="dmz_firewall-review.html">HTML</a><a class="format" href="dmz_firewall-review.pdf">PDF</a><a class="format" href="dmz_firewall-review.xlsx">Excel</a><a class="format" href="dmz_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name">Development<br><span class="pill mono">development</span></td>
+              <td class="name">
+<a href="development_firewall-review.html">Development</a>                <br><span class="pill mono">development</span>
+              </td>
               <td>dev@example.com</td>
               <td class="num">1</td>
               <td class="num">3</td>
@@ -830,9 +925,13 @@ h3.gap-head {
               <td class="num">10</td>
               <td class="num">18</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="development_firewall-review.html">HTML</a><a class="format" href="development_firewall-review.pdf">PDF</a><a class="format" href="development_firewall-review.xlsx">Excel</a><a class="format" href="development_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name">Reporting Service<br><span class="pill mono">reporting</span></td>
+              <td class="name">
+<a href="reporting_firewall-review.html">Reporting Service</a>                <br><span class="pill mono">reporting</span>
+              </td>
               <td>reporting@example.com</td>
               <td class="num">1</td>
               <td class="num">0</td>
@@ -843,6 +942,8 @@ h3.gap-head {
               <td class="num">14</td>
               <td class="num">2</td>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span>              </td>
+              <td><span class="formats"><a class="format" href="reporting_firewall-review.html">HTML</a><a class="format" href="reporting_firewall-review.pdf">PDF</a><a class="format" href="reporting_firewall-review.xlsx">Excel</a><a class="format" href="reporting_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
           </tbody>
         </table>
@@ -1146,70 +1247,70 @@ h3.gap-head {
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">development-pre-08</td>
               <td><span class="pill mono">DG-Development/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">development-pre-19</td>
               <td><span class="pill mono">DG-Development/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">dmz-pre-08</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">dmz-pre-19</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">partner-pre-08</td>
               <td><span class="pill mono">DG-Partner/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">partner-pre-19</td>
               <td><span class="pill mono">DG-Partner/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">production-pre-08</td>
               <td><span class="pill mono">DG-Production/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">production-pre-19</td>
               <td><span class="pill mono">DG-Production/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">shared-services-pre-08</td>
               <td><span class="pill mono">DG-Shared-Services/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span></td>
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">shared-services-pre-19</td>
               <td><span class="pill mono">DG-Shared-Services/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
             </tr>
             <tr>
               <td><span class="badge sev-medium"><span class="icon" aria-hidden="true">◆</span>Medium</span></td>
@@ -1643,175 +1744,175 @@ h3.gap-head {
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">development-post-01</td>
               <td><span class="pill mono">DG-Development/post</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">development-pre-01</td>
               <td><span class="pill mono">DG-Development/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">development-pre-06</td>
               <td><span class="pill mono">DG-Development/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">development-pre-11</td>
               <td><span class="pill mono">DG-Development/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">development-pre-16</td>
               <td><span class="pill mono">DG-Development/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-post-01</td>
               <td><span class="pill mono">DG-DMZ/post</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-01</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-06</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-11</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-16</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">partner-post-01</td>
               <td><span class="pill mono">DG-Partner/post</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">partner-pre-01</td>
               <td><span class="pill mono">DG-Partner/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">partner-pre-06</td>
               <td><span class="pill mono">DG-Partner/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">partner-pre-11</td>
               <td><span class="pill mono">DG-Partner/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">partner-pre-16</td>
               <td><span class="pill mono">DG-Partner/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">production-post-01</td>
               <td><span class="pill mono">DG-Production/post</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">production-pre-01</td>
               <td><span class="pill mono">DG-Production/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">production-pre-06</td>
               <td><span class="pill mono">DG-Production/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">production-pre-11</td>
               <td><span class="pill mono">DG-Production/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">production-pre-16</td>
               <td><span class="pill mono">DG-Production/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">shared-services-post-01</td>
               <td><span class="pill mono">DG-Shared-Services/post</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">shared-services-pre-01</td>
               <td><span class="pill mono">DG-Shared-Services/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">shared-services-pre-06</td>
               <td><span class="pill mono">DG-Shared-Services/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">shared-services-pre-11</td>
               <td><span class="pill mono">DG-Shared-Services/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">shared-services-pre-16</td>
               <td><span class="pill mono">DG-Shared-Services/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
             </tr>
             <tr>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span></td>
@@ -1988,6 +2089,8 @@ h3.gap-head {
   </footer>
 </div>
 
+<script type="application/json" id="team-networks">[{"id": "platform", "name": "Platform Services", "contact": "platform@example.com", "href": "platform_firewall-review.html", "nets": ["10.10.0.0/16", "10.10.1.5/32"], "own": 69}, {"id": "payments", "name": "Payments Platform", "contact": "payments@example.com", "href": "payments_firewall-review.html", "nets": ["10.20.0.0/16", "10.20.1.5/32"], "own": 53}, {"id": "dmz", "name": "DMZ Operations", "contact": "dmz@example.com", "href": "dmz_firewall-review.html", "nets": ["172.16.0.0/16"], "own": 20}, {"id": "development", "name": "Development", "contact": "dev@example.com", "href": "development_firewall-review.html", "nets": ["10.30.0.0/16"], "own": 20}, {"id": "reporting", "name": "Reporting Service", "contact": "reporting@example.com", "href": "reporting_firewall-review.html", "nets": ["10.20.1.7/32"], "own": 2}]</script>
+
 <script>
 (function () {
   "use strict";
@@ -2054,6 +2157,272 @@ h3.gap-head {
     button.setAttribute("aria-expanded", open ? "false" : "true");
     button.textContent = open ? "details" : "hide";
   });
+
+  // --- which team owns a network ----------------------------------------
+  //
+  // Address arithmetic in the page, not an answer table prepared while
+  // rendering: the question is asked about an arbitrary prefix, and there is no
+  // finite set of those to precompute. BigInt spans v4 and v6 in one code path,
+  // and a few hundred teams with a handful of networks each is a few thousand
+  // integer comparisons per keystroke -- below the threshold of noticing.
+  var lookupBox = document.getElementById("net-lookup");
+  var lookupOut = document.getElementById("net-results");
+  var lookupCount = document.getElementById("net-count");
+  var lookupClear = document.getElementById("net-clear");
+  var teams = [];
+  var payload = document.getElementById("team-networks");
+  if (payload) {
+    try { teams = JSON.parse(payload.textContent) || []; } catch (err) { teams = []; }
+  }
+
+  function readV4(text) {
+    var parts = text.split(".");
+    if (parts.length !== 4) return null;
+    var value = 0n;
+    for (var i = 0; i < 4; i++) {
+      if (!/^[0-9]{1,3}$/.test(parts[i])) return null;
+      var octet = parseInt(parts[i], 10);
+      if (octet > 255) return null;
+      value = (value << 8n) | BigInt(octet);
+    }
+    return value;
+  }
+
+  function readV6(text) {
+    // An embedded v4 tail (::ffff:10.1.2.3) becomes the two groups it stands
+    // for, so the rest of the parser only ever sees hextets.
+    var dot = text.lastIndexOf(".");
+    if (dot >= 0) {
+      var cut = text.lastIndexOf(":", dot);
+      if (cut < 0) return null;
+      var embedded = readV4(text.slice(cut + 1));
+      if (embedded === null) return null;
+      text = text.slice(0, cut + 1) + ((embedded >> 16n) & 0xffffn).toString(16) +
+             ":" + (embedded & 0xffffn).toString(16);
+    }
+    var halves = text.split("::");
+    if (halves.length > 2) return null;
+    var head = halves[0] ? halves[0].split(":") : [];
+    var groups;
+    if (halves.length === 1) {
+      groups = head;
+    } else {
+      var tail = halves[1] ? halves[1].split(":") : [];
+      var fill = 8 - head.length - tail.length;
+      if (fill < 1) return null;
+      groups = head.concat(new Array(fill).fill("0"), tail);
+    }
+    if (groups.length !== 8) return null;
+    var value = 0n;
+    for (var g = 0; g < 8; g++) {
+      if (!/^[0-9a-fA-F]{1,4}$/.test(groups[g])) return null;
+      value = (value << 16n) | BigInt(parseInt(groups[g], 16));
+    }
+    return value;
+  }
+
+  function showV4(value) {
+    var parts = [];
+    for (var shift = 24n; shift >= 0n; shift -= 8n) parts.push(((value >> shift) & 0xffn).toString(10));
+    return parts.join(".");
+  }
+
+  function showV6(value) {
+    var groups = [];
+    for (var shift = 112n; shift >= 0n; shift -= 16n) groups.push(((value >> shift) & 0xffffn).toString(16));
+    // The longest run of zero groups becomes "::" -- counted over the groups,
+    // never searched for in the joined text: "2001:db8:20:0:0:0:0:5" contains
+    // the string "0:0:0:0" starting inside "20", and collapsing there would
+    // silently answer about a different address.
+    var runAt = -1, runLength = 0, start = -1, length = 0;
+    for (var i = 0; i < 8; i++) {
+      if (groups[i] !== "0") { length = 0; continue; }
+      if (length === 0) start = i;
+      length++;
+      if (length > runLength) { runLength = length; runAt = start; }
+    }
+    if (runLength < 2) return groups.join(":");
+    return groups.slice(0, runAt).join(":") + "::" + groups.slice(runAt + runLength).join(":");
+  }
+
+  // A network as a closed range of addresses. Host bits are dropped, so
+  // 10.20.30.40/24 is read as the 10.20.30.0/24 the person meant.
+  function parseNet(text) {
+    text = (text || "").trim();
+    if (!text) return null;
+    var slash = text.indexOf("/");
+    var addr = slash < 0 ? text : text.slice(0, slash);
+    var six = addr.indexOf(":") >= 0;
+    var width = six ? 128 : 32;
+    var value = six ? readV6(addr) : readV4(addr);
+    if (value === null) return null;
+    var prefix = width;
+    if (slash >= 0) {
+      var written = text.slice(slash + 1);
+      if (!/^[0-9]{1,3}$/.test(written)) return null;
+      prefix = parseInt(written, 10);
+      if (prefix > width) return null;
+    }
+    var host = BigInt(width - prefix);
+    var start = (value >> host) << host;
+    return {
+      start: start,
+      end: start + ((1n << host) - 1n),
+      prefix: prefix,
+      version: six ? 6 : 4,
+      label: (six ? showV6(start) : showV4(start)) + "/" + prefix
+    };
+  }
+
+  function netsOf(team) {
+    if (!team.parsed) {
+      team.parsed = (team.nets || []).map(parseNet).filter(Boolean);
+    }
+    return team.parsed;
+  }
+
+  function cell(row, text, className) {
+    var td = document.createElement("td");
+    if (className) td.className = className;
+    td.textContent = text;
+    row.appendChild(td);
+    return td;
+  }
+
+  function note(text, href, linkText) {
+    var para = document.createElement("p");
+    para.className = "lede";
+    para.textContent = text;
+    if (href) {
+      para.appendChild(document.createTextNode(" "));
+      var link = document.createElement("a");
+      link.href = href;
+      link.textContent = linkText;
+      para.appendChild(link);
+    }
+    return para;
+  }
+
+  function lookup() {
+    if (!lookupOut) return;
+    lookupOut.textContent = "";
+    if (lookupCount) lookupCount.textContent = "";
+    var query = lookupBox ? lookupBox.value.trim() : "";
+    if (!query) return;
+
+    var wanted = parseNet(query);
+    if (!wanted) {
+      lookupOut.appendChild(note("Not an address or a network: type 10.243.48.0/25, 10.243.48.17 or 2001:db8:1::/48.", "", ""));
+      return;
+    }
+
+    var hits = [];
+    teams.forEach(function (team) {
+      var meeting = [];
+      var rank = 3;
+      netsOf(team).forEach(function (found) {
+        if (found.version !== wanted.version) return;
+        if (found.start > wanted.end || wanted.start > found.end) return;
+        var covers = found.start <= wanted.start && found.end >= wanted.end;
+        var inside = wanted.start <= found.start && wanted.end >= found.end;
+        var how = covers && inside ? 0 : (covers ? 1 : 2);
+        meeting.push({ range: found, how: how });
+        if (how < rank) rank = how;
+      });
+      if (!meeting.length) return;
+      // Within a team: the closest relation first, and among equals the most
+      // specific network -- except for the ones that merely fall inside a wide
+      // query, which read as an address plan and so go in address order.
+      meeting.sort(function (first, second) {
+        if (first.how !== second.how) return first.how - second.how;
+        if (first.how === 2) return first.range.start < second.range.start ? -1 : 1;
+        return second.range.prefix - first.range.prefix;
+      });
+      hits.push({ team: team, rank: rank, meeting: meeting });
+    });
+
+    // Exact match first, then the networks that contain the query -- most
+    // specific first, since that is the team who actually runs it, not the one
+    // holding the site supernet around it. Teams that merely fall inside a wide
+    // query come last, in address order: sorted by specificity they would lead
+    // with whoever happens to own the smallest fragment, and a /13 answered by
+    // a hundred accounts is read as an address plan.
+    hits.sort(function (a, b) {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (a.rank === 2 && a.meeting[0].range.start !== b.meeting[0].range.start) {
+        return a.meeting[0].range.start < b.meeting[0].range.start ? -1 : 1;
+      }
+      return b.meeting[0].range.prefix - a.meeting[0].range.prefix ||
+             a.team.name.localeCompare(b.team.name);
+    });
+
+    if (lookupCount) {
+      lookupCount.textContent = hits.length === 1
+        ? "1 team meets " + wanted.label
+        : hits.length + " teams meet " + wanted.label;
+    }
+
+    if (!hits.length) {
+      lookupOut.appendChild(note(
+        "No team's inventory meets " + wanted.label + ". Rules touching it reach nobody — they are in",
+        lookupOut.getAttribute("data-unassigned") || "",
+        "Rules without an owner."));
+      return;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "table-scroll" + (hits.length > 12 ? " capped" : "");
+    var table = document.createElement("table");
+    // The relation is the team's closest one, and the networks are listed
+    // closest first, so the word and the first address in the row agree.
+    table.innerHTML = "<thead><tr><th>Team</th><th>Contact</th><th>Its networks</th>" +
+                      "<th>Closest match</th><th class=\"num\">Own rules</th></tr></thead>";
+    var body = document.createElement("tbody");
+
+    hits.slice(0, 100).forEach(function (hit) {
+      var row = document.createElement("tr");
+      var name = document.createElement("td");
+      name.className = "name";
+      if (hit.team.href) {
+        var link = document.createElement("a");
+        link.href = hit.team.href;
+        link.textContent = hit.team.name;
+        name.appendChild(link);
+      } else {
+        name.appendChild(document.createTextNode(hit.team.name));
+      }
+      name.appendChild(document.createElement("br"));
+      var id = document.createElement("span");
+      id.className = "pill mono";
+      id.textContent = hit.team.id;
+      name.appendChild(id);
+      row.appendChild(name);
+
+      cell(row, hit.team.contact || "—");
+      cell(row, hit.meeting.slice(0, 4).map(function (met) { return met.range.label; }).join(", ") +
+                (hit.meeting.length > 4 ? " and " + (hit.meeting.length - 4) + " more" : ""), "addr");
+      cell(row, hit.rank === 0 ? "exactly this network"
+                : (hit.rank === 1 ? "contains it" : "lies inside it"));
+      cell(row, String(hit.team.own), "num");
+      body.appendChild(row);
+    });
+
+    table.appendChild(body);
+    wrap.appendChild(table);
+    lookupOut.appendChild(wrap);
+    if (hits.length > 100) {
+      lookupOut.appendChild(note("Showing the first 100 of " + hits.length + ".", "", ""));
+    }
+  }
+
+  if (lookupBox) lookupBox.addEventListener("input", lookup);
+  if (lookupClear) {
+    lookupClear.addEventListener("click", function () {
+      if (lookupBox) lookupBox.value = "";
+      lookup();
+      if (lookupBox) lookupBox.focus();
+    });
+  }
 })();
 </script>
 </body>

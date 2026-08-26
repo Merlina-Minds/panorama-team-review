@@ -141,6 +141,7 @@ header.report.compact { padding: 0.5rem 0 0.4rem; }
 header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
 header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
 header.report.compact .provenance { display: none; }
+header.report.compact .siblings { display: none; }
 header.report.compact nav.jump { margin-top: 0.35rem; }
 
 .provenance {
@@ -152,6 +153,42 @@ header.report.compact nav.jump { margin-top: 0.35rem; }
 }
 
 .provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- the same document, in its other formats ----------------------------- */
+
+/* One review is four files: a page, a PDF, a workbook, a JSON record. The links
+ * between them are deliberately quiet -- small outlined pills under the title,
+ * never a toolbar. Nobody opens a report in order to change its format; they do
+ * it afterwards, to forward what they just read. */
+
+.siblings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.formats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.formats-label { font-size: 0.78rem; color: var(--ink-muted); }
+
+a.format {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+a.format:hover { border-color: var(--link); color: var(--link); }
 
 /* --- jump navigation ----------------------------------------------------- */
 
@@ -293,6 +330,12 @@ a.tile:hover .tile-go { color: var(--accent); }
 
 .controls .spacer { flex: 1 1 auto; }
 .controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* The address lookup answers into this. It is empty until something is typed:
+ * an empty result table under an empty box reads as "no team owns anything". */
+.lookup-results:empty { display: none; }
+.lookup-results { margin-top: 0.75rem; }
+.lookup-results .lede { margin: 0.25rem 0 0; }
 
 /* --- parts -------------------------------------------------------------- */
 
@@ -696,13 +739,14 @@ h3.gap-head {
 <body>
 <a id="top"></a>
 
+
 <header class="report" id="page-header">
   <div class="wrap">
     <h1>Firewall Rule Review</h1>
     <div class="subject">Index of reports · Example Corp</div>
     <div class="provenance">
       <span><b>Configuration:</b> example-estate.xml</span>
-<span><b>Backup from:</b> 2026-08-07 16:09</span>      <span><b>Generated:</b> 2026-08-07 16:09</span>
+<span><b>Backup from:</b> 2026-08-26 23:14</span>      <span><b>Generated:</b> 2026-08-26 23:14</span>
 <span><b>PAN-OS:</b> 11.1.0</span>      <span><b>Tool:</b> panorama-team-review 0.1.0</span>
     </div>
   </div>
@@ -719,16 +763,37 @@ h3.gap-head {
     <a class="tile " href="#s-teams">
   <div class="value">5</div>
   <div class="label">Team reports</div>
-<div class="hint">One HTML file each</div>  <span class="tile-go" aria-hidden="true">↓</span>
+<div class="hint">One per team</div>  <span class="tile-go" aria-hidden="true">↓</span>
 </a>
 
     <a class="tile " href="00_OVERVIEW_all-teams.html">
   <div class="value">Open</div>
   <div class="label">Overview across all teams</div>
-<div class="hint">Every team on one page</div>  <span class="tile-go" aria-hidden="true">↓</span>
+<div class="hint">Every team on one page, and the network lookup</div>  <span class="tile-go" aria-hidden="true">↓</span>
 </a>
 
   </div>
+
+  <section class="block" id="s-overview">
+    <h2 class="section-head">
+  <button class="collapse" data-collapse="overview" aria-expanded="true"
+          aria-controls="s-overview" title="Collapse or expand this section">
+    <span class="chevron" aria-hidden="true">▾</span>
+  </button>
+  <span class="section-title">Overview across all teams</span>
+  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
+</h2>
+
+    <div class="collapsible" data-body="overview">
+      <p class="lede">
+        The firewall team's own view: every team on one page, the rules without an owner,
+        the inventory gaps, and a lookup that answers <em>which team owns this network?</em>
+        <a href="00_OVERVIEW_all-teams.html">Open the overview →</a>
+      </p>
+      <span class="formats"><span class="formats-label">Also as</span><a class="format" href="00_OVERVIEW_all-teams.pdf">PDF</a><a class="format" href="00_OVERVIEW_all-teams.xlsx">Excel</a><a class="format" href="00_OVERVIEW_all-teams.json.gz">JSON</a></span>
+
+    </div>
+  </section>
 
   <section class="block" id="s-teams">
     <h2 class="section-head">
@@ -744,60 +809,81 @@ h3.gap-head {
       <p class="lede">
         One report per team. <em>Own</em> counts the rules written for that team's address space —
         the review workload; <em>Also covers</em> counts the estate-wide rules that include them
-        without being theirs. Open a team to see its rules, findings and evidence.
+        without being theirs. Open a team to see its rules, findings and evidence, or take the
+        same report as a PDF or a spreadsheet from the last column.
       </p>
       <div class="table-scroll">
         <table>
           <thead><tr>
             <th>Team</th><th>Contact</th><th class="num">Networks</th>
             <th class="num">Own total</th><th class="num">Also covers</th>
-            <th class="num">Findings</th><th>Worst</th>
+            <th class="num">Findings</th><th>Worst</th><th>Report</th>
           </tr></thead>
           <tbody>
             <tr>
-              <td class="name"><a href="platform_firewall-review.html">Platform Services</a><br><span class="pill mono">platform</span></td>
+              <td class="name">
+<a href="platform_firewall-review.html">Platform Services</a>                <br><span class="pill mono">platform</span>
+              </td>
               <td>platform@example.com</td>
               <td class="num">2</td>
               <td class="num">69</td>
               <td class="num">9</td>
               <td class="num">67</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="platform_firewall-review.html">HTML</a><a class="format" href="platform_firewall-review.pdf">PDF</a><a class="format" href="platform_firewall-review.xlsx">Excel</a><a class="format" href="platform_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name"><a href="payments_firewall-review.html">Payments Platform</a><br><span class="pill mono">payments</span></td>
+              <td class="name">
+<a href="payments_firewall-review.html">Payments Platform</a>                <br><span class="pill mono">payments</span>
+              </td>
               <td>payments@example.com</td>
               <td class="num">2</td>
               <td class="num">53</td>
               <td class="num">5</td>
               <td class="num">61</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="payments_firewall-review.html">HTML</a><a class="format" href="payments_firewall-review.pdf">PDF</a><a class="format" href="payments_firewall-review.xlsx">Excel</a><a class="format" href="payments_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name"><a href="dmz_firewall-review.html">DMZ Operations</a><br><span class="pill mono">dmz</span></td>
+              <td class="name">
+<a href="dmz_firewall-review.html">DMZ Operations</a>                <br><span class="pill mono">dmz</span>
+              </td>
               <td>dmz@example.com</td>
               <td class="num">1</td>
               <td class="num">20</td>
               <td class="num">10</td>
               <td class="num">18</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="dmz_firewall-review.html">HTML</a><a class="format" href="dmz_firewall-review.pdf">PDF</a><a class="format" href="dmz_firewall-review.xlsx">Excel</a><a class="format" href="dmz_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name"><a href="development_firewall-review.html">Development</a><br><span class="pill mono">development</span></td>
+              <td class="name">
+<a href="development_firewall-review.html">Development</a>                <br><span class="pill mono">development</span>
+              </td>
               <td>dev@example.com</td>
               <td class="num">1</td>
               <td class="num">20</td>
               <td class="num">10</td>
               <td class="num">18</td>
               <td><span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span>              </td>
+              <td><span class="formats"><a class="format" href="development_firewall-review.html">HTML</a><a class="format" href="development_firewall-review.pdf">PDF</a><a class="format" href="development_firewall-review.xlsx">Excel</a><a class="format" href="development_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
             <tr>
-              <td class="name"><a href="reporting_firewall-review.html">Reporting Service</a><br><span class="pill mono">reporting</span></td>
+              <td class="name">
+<a href="reporting_firewall-review.html">Reporting Service</a>                <br><span class="pill mono">reporting</span>
+              </td>
               <td>reporting@example.com</td>
               <td class="num">1</td>
               <td class="num">2</td>
               <td class="num">14</td>
               <td class="num">2</td>
               <td><span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span>              </td>
+              <td><span class="formats"><a class="format" href="reporting_firewall-review.html">HTML</a><a class="format" href="reporting_firewall-review.pdf">PDF</a><a class="format" href="reporting_firewall-review.xlsx">Excel</a><a class="format" href="reporting_firewall-review.json.gz">JSON</a></span>
+</td>
             </tr>
           </tbody>
         </table>
@@ -805,22 +891,25 @@ h3.gap-head {
     </div>
   </section>
 
-  <section class="block" id="s-overview">
-    <h2 class="section-head">
-  <button class="collapse" data-collapse="overview" aria-expanded="true"
-          aria-controls="s-overview" title="Collapse or expand this section">
-    <span class="chevron" aria-hidden="true">▾</span>
-  </button>
-  <span class="section-title">Overview across all teams</span>
-  <a class="to-top" href="#top" title="Back to the top of the report">↑ top</a>
-</h2>
-
-    <p class="lede">
-      The firewall team's own view: every team on one page, plus the rules without an owner,
-      inventory gaps and all findings. <a href="00_OVERVIEW_all-teams.html">Open the overview →</a>
-    </p>
-  </section>
-
 </div>
+
+<script>
+(function () {
+  "use strict";
+  document.querySelectorAll("button.collapse").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var body = document.querySelector(
+        '.collapsible[data-body="' + button.getAttribute("data-collapse") + '"]');
+      if (!body) return;
+      var collapsed = button.getAttribute("aria-expanded") === "true";
+      body.classList.toggle("hidden", collapsed);
+      button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      var head = button.closest(".section-head");
+      if (head) head.classList.toggle("collapsed", collapsed);
+    });
+  });
+})();
+</script>
+
 </body>
 </html>

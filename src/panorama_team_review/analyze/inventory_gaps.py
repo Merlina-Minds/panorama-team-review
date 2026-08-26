@@ -18,6 +18,12 @@ have papered over it: the rules would have appeared without direction, without
 matched networks, and the group would have stayed wrong for everything else
 that uses it.
 
+Each gap names *where* the team's networks were read from -- ``Team.origin``,
+which is an address group on an estate that derives its teams, and the
+inventory file on one that writes them down. Without it the report states a
+disagreement and leaves the reader to guess what to edit, which on a derived
+estate is not the inventory file at all.
+
 **A network two teams' names both claim.** Either a range was reassigned and
 the old object outlived it, or two objects describe the same addresses. Either
 way a rule touching that network is attributed to both accounts, and neither
@@ -46,9 +52,10 @@ def find_inventory_gaps(
 
     compiled = [(re.compile(rule.pattern, re.IGNORECASE), rule) for rule in rules]
     known = {team.id: _networks(team) for team in teams}
+    origins = {team.id: team.origin for team in teams}
 
     claims = _collect_claims(snapshot, compiled, known)
-    return _outside_team(claims, known) + _claimed_twice(claims)
+    return _outside_team(claims, known, origins) + _claimed_twice(claims)
 
 
 class _Claim:
@@ -98,7 +105,9 @@ def _collect_claims(snapshot, compiled, known) -> list[_Claim]:
     return claims
 
 
-def _outside_team(claims: list[_Claim], known: dict[str, list]) -> list[InventoryGap]:
+def _outside_team(
+    claims: list[_Claim], known: dict[str, list], origins: dict[str, str]
+) -> list[InventoryGap]:
     gaps = []
     for claim in claims:
         assets = known[claim.team_id]
@@ -109,16 +118,19 @@ def _outside_team(claims: list[_Claim], known: dict[str, list]) -> list[Inventor
             continue
         held = ", ".join(str(a) for a in assets[:4]) or "nothing"
         more = f" and {len(assets) - 4} more" if len(assets) > 4 else ""
+        source = origins.get(claim.team_id) or "the inventory"
         gaps.append(
             InventoryGap(
                 kind="outside-team",
                 team_id=claim.team_id,
                 object_name=claim.name,
                 network=str(claim.network),
+                team_networks=[str(asset) for asset in assets],
+                team_source=source,
                 detail=(
-                    f"the name assigns this object to {claim.team_id}, whose inventory "
-                    f"holds {held}{more} -- so every rule touching {claim.network} is "
-                    "missing from that team's report"
+                    f"the name assigns this object to {claim.team_id}, whose networks come "
+                    f"from {source} and hold {held}{more} -- so every rule touching "
+                    f"{claim.network} is missing from that team's report"
                 ),
             )
         )

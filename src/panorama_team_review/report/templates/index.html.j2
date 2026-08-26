@@ -9,6 +9,8 @@
 <body>
 <a id="top"></a>
 
+{% set overview = bundle.outputs.combined_href() %}
+
 <header class="report" id="page-header">
   <div class="wrap">
     <h1>{{ config.report.title }}</h1>
@@ -25,34 +27,54 @@
 
 <div class="wrap">
 
-  {% if overview_href %}
   <div class="tiles">
     {{ m.tile(bundle.stats.get("rules_analysed", 0), "Rules analysed") }}
-    {{ m.tile(entries | length, "Team reports", "One HTML file each", "", "#s-teams") }}
-    {{ m.tile("Open", "Overview across all teams", "Every team on one page", "", overview_href) }}
+    {{ m.tile(reports | length, "Team reports", "One per team", "", "#s-teams") }}
+    {% if overview %}
+    {{ m.tile("Open", "Overview across all teams", "Every team on one page, and the network lookup", "", overview) }}
+    {% endif %}
   </div>
+
+  {% if overview %}
+  <section class="block" id="s-overview">
+    {{ m.section_heading("Overview across all teams", "", "overview") }}
+    <div class="collapsible" data-body="overview">
+      <p class="lede">
+        The firewall team's own view: every team on one page, the rules without an owner,
+        the inventory gaps, and a lookup that answers <em>which team owns this network?</em>
+        <a href="{{ overview }}">Open the overview →</a>
+      </p>
+      {{ m.format_links(bundle.outputs.combined_formats("html"), formats, "Also as") }}
+    </div>
+  </section>
   {% endif %}
 
   <section class="block" id="s-teams">
-    {{ m.section_heading("Team reports", entries | length, "teams") }}
+    {{ m.section_heading("Team reports", reports | length, "teams") }}
     <div class="collapsible" data-body="teams">
-      {% if entries %}
+      {% if reports %}
       <p class="lede">
         One report per team. <em>Own</em> counts the rules written for that team's address space —
         the review workload; <em>Also covers</em> counts the estate-wide rules that include them
-        without being theirs. Open a team to see its rules, findings and evidence.
+        without being theirs. Open a team to see its rules, findings and evidence, or take the
+        same report as a PDF or a spreadsheet from the last column.
       </p>
       <div class="table-scroll">
         <table>
           <thead><tr>
             <th>Team</th><th>Contact</th><th class="num">Networks</th>
             <th class="num">Own total</th><th class="num">Also covers</th>
-            <th class="num">Findings</th><th>Worst</th>
+            <th class="num">Findings</th><th>Worst</th><th>Report</th>
           </tr></thead>
           <tbody>
-          {% for report, href in entries %}
+          {% for report in reports %}
+            {% set files = bundle.outputs.teams.get(report.team.id, {}) %}
             <tr>
-              <td class="name"><a href="{{ href }}">{{ report.team.name }}</a><br><span class="pill mono">{{ report.team.id }}</span></td>
+              <td class="name">
+                {% if files.html %}<a href="{{ files.html }}">{{ report.team.name }}</a>
+                {%- else %}{{ report.team.name }}{% endif %}
+                <br><span class="pill mono">{{ report.team.id }}</span>
+              </td>
               <td>{{ report.team.contact or "—" }}</td>
               <td class="num">{{ report.team.assets | length }}</td>
               <td class="num">{{ report.own_rule_count }}</td>
@@ -66,27 +88,20 @@
                 {%- elif worst %}{{ m.severity_badge("info") }}
                 {%- else %}<span class="pill">none</span>{% endif %}
               </td>
+              <td>{{ m.format_links(bundle.outputs.team_formats(report.team.id), formats, "") }}</td>
             </tr>
           {% endfor %}
           </tbody>
         </table>
       </div>
       {% else %}
-      <p class="lede">No per-team HTML reports were written for this run.</p>
+      <p class="lede">No per-team reports were written for this run.</p>
       {% endif %}
     </div>
   </section>
 
-  {% if overview_href %}
-  <section class="block" id="s-overview">
-    {{ m.section_heading("Overview across all teams", "", "overview") }}
-    <p class="lede">
-      The firewall team's own view: every team on one page, plus the rules without an owner,
-      inventory gaps and all findings. <a href="{{ overview_href }}">Open the overview →</a>
-    </p>
-  </section>
-  {% endif %}
-
 </div>
+
+{{ m.collapse_script() }}
 </body>
 </html>

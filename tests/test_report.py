@@ -5,13 +5,13 @@ from __future__ import annotations
 import gzip
 import json
 import zipfile
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
 from panorama_team_review.config import Config, OutputConfig, ReportConfig
 from panorama_team_review.model import AddressMember, ResolvedAddresses
-from panorama_team_review.report import diff, excel, html, json_report, pdf
+from panorama_team_review.report import diff, excel, html, json_report, links, pdf
 from panorama_team_review.report import format as fmt
 from panorama_team_review.report.build import build_report
 
@@ -400,6 +400,99 @@ def test_html_combined_lists_every_team(bundle, config):
 def test_html_writes_a_file(bundle, config, tmp_path):
     path = html.write_team(bundle, bundle.teams[0], tmp_path / "r.html", config)
     assert path.stat().st_size > 5000
+
+
+# ---------------------------------------------------------------------------
+# The links between the files of one run
+# ---------------------------------------------------------------------------
+
+
+def _every_format(bundle, config) -> Config:
+    """The run as it looks when all four formats were asked for."""
+    wanted = config.model_copy(deep=True)
+    wanted.output.formats = ["html", "xlsx", "pdf", "json"]
+    bundle.outputs = links.plan(wanted, bundle.generated_at, bundle.teams)
+    return wanted
+
+
+def test_the_plan_names_a_file_per_team_and_format(bundle, config):
+    _every_format(bundle, config)
+    plan = bundle.outputs
+    for report in bundle.teams:
+        files = plan.teams[report.team.id]
+        assert files["html"].endswith(".html")
+        # Only JSON differs from its format name, because it is gzipped.
+        assert files["json"].endswith(".json.gz")
+    assert plan.combined["pdf"].endswith(".pdf")
+
+
+def test_the_plan_skips_a_format_nobody_asked_for(bundle, config):
+    """A link to a PDF that was never rendered is worse than no link."""
+    bundle.outputs = links.plan(config, bundle.generated_at, bundle.teams)
+    assert set(bundle.outputs.combined) == {"json"}
+    assert "html" not in bundle.outputs.teams[bundle.teams[0].team.id]
+
+
+def test_the_plan_covers_only_the_teams_that_are_rendered(bundle, config):
+    """With --sample most teams have no page; the overview must not link to one."""
+    sampled = bundle.teams[:1]
+    bundle.outputs = links.plan(config, bundle.generated_at, sampled)
+    assert list(bundle.outputs.teams) == [sampled[0].team.id]
+
+
+def test_the_overview_opens_every_team_report(bundle, config):
+    wanted = _every_format(bundle, config)
+    content = html.render_combined(bundle, wanted)
+    for report in bundle.teams:
+        assert f'href="{bundle.outputs.team_href(report.team.id)}"' in content
+
+
+def test_a_team_report_offers_its_other_formats(bundle, config):
+    wanted = _every_format(bundle, config)
+    report = bundle.teams[0]
+    content = html.render_team(bundle, report, wanted)
+    for other in ("pdf", "xlsx", "json"):
+        assert f'href="{bundle.outputs.team_href(report.team.id, other)}"' in content
+
+
+def test_a_team_report_does_not_link_the_cross_team_overview(bundle, config):
+    """It is forwarded on its own: that link is either dead or a disclosure."""
+    wanted = _every_format(bundle, config)
+    content = html.render_team(bundle, bundle.teams[0], wanted)
+    assert bundle.outputs.combined_href() not in content
+
+
+def test_the_overview_carries_every_teams_networks_for_the_lookup(bundle, config):
+    """The address lookup answers in the page, so the inventory has to be in it."""
+    wanted = _every_format(bundle, config)
+    content = html.render_combined(bundle, wanted)
+    payload = content.split('id="team-networks">')[1].split("</script>")[0]
+    entries = {entry["id"]: entry for entry in json.loads(payload)}
+    for report in bundle.teams:
+        if not report.team.assets:
+            continue
+        assert entries[report.team.id]["nets"] == report.team.assets
+        assert entries[report.team.id]["href"] == bundle.outputs.team_href(report.team.id)
+
+
+def test_the_index_lists_every_team_in_every_format(bundle, config):
+    wanted = _every_format(bundle, config)
+    content = html.render_index(bundle, wanted, bundle.teams)
+    for report in bundle.teams:
+        for other in ("html", "pdf", "xlsx", "json"):
+            assert f'href="{bundle.outputs.team_href(report.team.id, other)}"' in content
+    assert f'href="{bundle.outputs.combined_href()}"' in content
+
+
+def test_the_webroot_index_leads_to_the_newest_overview(config):
+    """The page above the dated runs: what a web server serves for the folder."""
+    runs = [
+        html.RunEntry("2026-07-28", datetime(2026, 7, 28, 6, 0), "2026-07-28/index.html", "o.html"),
+        html.RunEntry("2026-07-21", datetime(2026, 7, 21, 6, 0), "2026-07-21/index.html", "o.html"),
+    ]
+    content = html.render_runs_index(config, runs)
+    assert 'href="2026-07-28/o.html"' in content
+    assert 'href="2026-07-21/index.html"' in content
 
 
 def test_covered_rules_show_their_usage(config):

@@ -12,6 +12,9 @@ format rather than an afterthought.
 
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -21,6 +24,7 @@ from markupsafe import Markup, escape
 from ..config import Config
 from ..model import ReportBundle, ResolvedAddresses, ResolvedServices, RuleView, TeamReport
 from . import format as fmt
+from . import links
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -260,6 +264,7 @@ def render_team(bundle: ReportBundle, report: TeamReport, config: Config) -> str
         config=config,
         css=_stylesheet("base.css"),
         asset_counts=_asset_counts(report),
+        formats=links.FORMAT_LABELS,
     )
 
 
@@ -269,6 +274,8 @@ def render_combined(bundle: ReportBundle, config: Config) -> str:
         bundle=bundle,
         config=config,
         css=_stylesheet("base.css"),
+        formats=links.FORMAT_LABELS,
+        team_networks=_team_networks(bundle),
     )
 
 
@@ -284,38 +291,80 @@ def write_combined(bundle: ReportBundle, path: Path, config: Config) -> Path:
     return path
 
 
-def render_index(
-    bundle: ReportBundle,
-    config: Config,
-    entries: list[tuple[TeamReport, str]],
-    overview_href: str | None,
-) -> str:
-    """A landing page linking to every team's HTML report and the overview.
+def render_index(bundle: ReportBundle, config: Config, reports: list[TeamReport]) -> str:
+    """The landing page of a run: every team, in every format the run wrote.
 
-    ``entries`` pairs each team report with the relative filename of its HTML
-    output; ``overview_href`` is the combined report's, or ``None`` when it was
-    not written.
+    ``reports`` is the teams that were rendered -- the sampled subset when
+    ``--sample`` was given. Which files exist for each of them comes from
+    ``bundle.outputs``, so a link is offered only where there is a file.
     """
     template = _environment().get_template("index.html.j2")
     return template.render(
         bundle=bundle,
         config=config,
         css=_stylesheet("base.css"),
-        entries=entries,
-        overview_href=overview_href,
+        reports=reports,
+        formats=links.FORMAT_LABELS,
     )
 
 
 def write_index(
-    bundle: ReportBundle,
-    config: Config,
-    path: Path,
-    entries: list[tuple[TeamReport, str]],
-    overview_href: str | None,
+    bundle: ReportBundle, config: Config, path: Path, reports: list[TeamReport]
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_index(bundle, config, entries, overview_href), encoding="utf-8")
+    path.write_text(render_index(bundle, config, reports), encoding="utf-8")
     return path
+
+
+@dataclass(frozen=True)
+class RunEntry:
+    """One dated run directory, as the root index lists it."""
+
+    name: str
+    when: datetime
+    index: str
+    overview: str = ""
+
+
+def render_runs_index(config: Config, runs: list[RunEntry]) -> str:
+    """The page above the runs: what a web server serves for the reports folder."""
+    template = _environment().get_template("runs_index.html.j2")
+    return template.render(config=config, css=_stylesheet("base.css"), runs=runs)
+
+
+def write_runs_index(config: Config, path: Path, runs: list[RunEntry]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_runs_index(config, runs), encoding="utf-8")
+    return path
+
+
+def _team_networks(bundle: ReportBundle) -> Markup:
+    """Every team's networks, as JSON the overview's address lookup can read.
+
+    The lookup answers the question an overview otherwise cannot: *this*
+    network turned up in a ticket -- whose is it? Answering it means comparing
+    an address against every team's inventory, so the inventory has to be in
+    the page. It is embedded rather than fetched because these reports are
+    opened from disk, where fetch() of a sibling file is blocked.
+
+    Teams without networks are left out: they can never be an answer, and on an
+    estate deriving hundreds of teams they are most of the payload.
+    """
+    payload = [
+        {
+            "id": report.team.id,
+            "name": report.team.name,
+            "contact": report.team.contact or "",
+            "href": bundle.outputs.team_href(report.team.id),
+            "nets": report.team.assets,
+            "own": report.own_rule_count,
+        }
+        for report in bundle.teams
+        if report.team.assets
+    ]
+    # `</` cannot appear literally inside a script element: the HTML parser ends
+    # the block there, whatever the data meant.
+    return Markup(json.dumps(payload, ensure_ascii=False).replace("</", "<\\/"))
 
 
 def _asset_counts(report: TeamReport) -> dict[str, dict[str, int]]:

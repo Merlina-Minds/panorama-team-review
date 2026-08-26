@@ -91,7 +91,8 @@ installed:
 |---|---|
 | [`example/reports/payments_firewall-review.html`](example/reports/payments_firewall-review.html) | A typical owner's report |
 | [`example/reports/reporting_firewall-review.html`](example/reports/reporting_firewall-review.html) | A team that owns one host inside somebody else's network, so almost nothing in its report is its own to decide |
-| [`example/reports/00_OVERVIEW_all-teams.html`](example/reports/00_OVERVIEW_all-teams.html) | The firewall team's cross-team view |
+| [`example/reports/00_OVERVIEW_all-teams.html`](example/reports/00_OVERVIEW_all-teams.html) | The firewall team's cross-team view, including the lookup that answers *which team owns this network?* |
+| [`example/reports/index.html`](example/reports/index.html) | The index of a run: every team, in every format it was written in |
 
 Nothing in it comes from a real configuration; see
 [example/README.md](example/README.md).

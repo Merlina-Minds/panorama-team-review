@@ -141,6 +141,7 @@ header.report.compact { padding: 0.5rem 0 0.4rem; }
 header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
 header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
 header.report.compact .provenance { display: none; }
+header.report.compact .siblings { display: none; }
 header.report.compact nav.jump { margin-top: 0.35rem; }
 
 .provenance {
@@ -152,6 +153,42 @@ header.report.compact nav.jump { margin-top: 0.35rem; }
 }
 
 .provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- the same document, in its other formats ----------------------------- */
+
+/* One review is four files: a page, a PDF, a workbook, a JSON record. The links
+ * between them are deliberately quiet -- small outlined pills under the title,
+ * never a toolbar. Nobody opens a report in order to change its format; they do
+ * it afterwards, to forward what they just read. */
+
+.siblings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.formats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.formats-label { font-size: 0.78rem; color: var(--ink-muted); }
+
+a.format {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+a.format:hover { border-color: var(--link); color: var(--link); }
 
 /* --- jump navigation ----------------------------------------------------- */
 
@@ -293,6 +330,12 @@ a.tile:hover .tile-go { color: var(--accent); }
 
 .controls .spacer { flex: 1 1 auto; }
 .controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* The address lookup answers into this. It is empty until something is typed:
+ * an empty result table under an empty box reads as "no team owns anything". */
+.lookup-results:empty { display: none; }
+.lookup-results { margin-top: 0.75rem; }
+.lookup-results .lede { margin: 0.25rem 0 0; }
 
 /* --- parts -------------------------------------------------------------- */
 
@@ -703,9 +746,12 @@ h3.gap-head {
     <div class="subject">DMZ Operations · dmz@example.com</div>
     <div class="provenance">
       <span><b>Configuration:</b> example-estate.xml</span>
-<span><b>Backup from:</b> 2026-08-07 16:09</span>      <span><b>Report generated:</b> 2026-08-07 16:09</span>
+<span><b>Backup from:</b> 2026-08-26 23:14</span>      <span><b>Report generated:</b> 2026-08-26 23:14</span>
       <span><b>Tool:</b> panorama-team-review 0.1.0</span>
     </div>
+
+    <div class="siblings"><span class="formats"><span class="formats-label">This report as</span><a class="format" href="dmz_firewall-review.pdf">PDF</a><a class="format" href="dmz_firewall-review.xlsx">Excel</a><a class="format" href="dmz_firewall-review.json.gz">JSON</a></span>
+</div>
 
     <nav class="jump" aria-label="Sections of this report">
 <a href="#s-networks">Your networks</a><a href="#s-objects">Objects &amp; groups</a><a href="#s-own-inbound">Inbound</a><a href="#s-own-outbound">Outbound</a><a href="#s-own-internal">Both ends yours</a><a href="#s-covered-other">Also covers: other</a><a href="#s-findings">Cleanup candidates</a>    </nav>
@@ -1535,7 +1581,7 @@ Resolves to 172.16.0.0/16">net-dmz</span></td><td class="objs"><span class="name
   <div class="finding-item high">
     <span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span> <strong>Past its stated expiry date</strong>
     <span class="pill mono">EXPIRED_RULE</span>
-    <div>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</div>
+    <div>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</div>
 <div class="rec">Suggested action: Remove the rule, or extend it with a new change reference.</div>  </div>
 </div>
 
@@ -1743,7 +1789,7 @@ Resolves to 172.16.1.5/32, 172.16.1.9/32, 172.16.1.13/32, 172.16.1.17/32, 172.16
   <div class="finding-item info">
     <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>Expires soon</strong>
     <span class="pill mono">EXPIRING_SOON</span>
-    <div>The stated expiry is 2026-08-27, in 20 days.</div>
+    <div>The stated expiry is 2026-08-27, in 1 days.</div>
 <div class="rec">Suggested action: Confirm whether the access is still needed before it lapses.</div>  </div>
 </div>
 
@@ -1887,7 +1933,7 @@ Resolves to 172.16.1.5/32, 172.16.1.6/32">grp-dmz-app</span></td><td class="objs
   <div class="finding-item info">
     <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>Expires soon</strong>
     <span class="pill mono">EXPIRING_SOON</span>
-    <div>The stated expiry is 2026-08-27, in 20 days.</div>
+    <div>The stated expiry is 2026-08-27, in 1 days.</div>
 <div class="rec">Suggested action: Confirm whether the access is still needed before it lapses.</div>  </div>
 </div>
 
@@ -1962,7 +2008,7 @@ Resolves to 172.16.0.0/16">net-dmz</span></td><td class="objs"><span class="name
   <div class="finding-item high">
     <span class="badge sev-high"><span class="icon" aria-hidden="true">▲</span>High</span> <strong>Past its stated expiry date</strong>
     <span class="pill mono">EXPIRED_RULE</span>
-    <div>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</div>
+    <div>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</div>
 <div class="rec">Suggested action: Remove the rule, or extend it with a new change reference.</div>  </div>
 </div>
 
@@ -2137,7 +2183,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
   <div class="finding-item info">
     <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>Expires soon</strong>
     <span class="pill mono">EXPIRING_SOON</span>
-    <div>The stated expiry is 2026-08-27, in 20 days.</div>
+    <div>The stated expiry is 2026-08-27, in 1 days.</div>
 <div class="rec">Suggested action: Confirm whether the access is still needed before it lapses.</div>  </div>
 </div>
 
@@ -2213,7 +2259,7 @@ Resolves to 172.16.0.0/16">net-dmz</span></td><td class="objs"><span class="name
   <div class="finding-item info">
     <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>Expires soon</strong>
     <span class="pill mono">EXPIRING_SOON</span>
-    <div>The stated expiry is 2026-08-27, in 20 days.</div>
+    <div>The stated expiry is 2026-08-27, in 1 days.</div>
 <div class="rec">Suggested action: Confirm whether the access is still needed before it lapses.</div>  </div>
 </div>
 
@@ -2572,7 +2618,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
   <div class="finding-item info">
     <span class="badge sev-info"><span class="icon" aria-hidden="true">○</span>Info</span> <strong>Expires soon</strong>
     <span class="pill mono">EXPIRING_SOON</span>
-    <div>The stated expiry is 2026-08-27, in 20 days.</div>
+    <div>The stated expiry is 2026-08-27, in 1 days.</div>
 <div class="rec">Suggested action: Confirm whether the access is still needed before it lapses.</div>  </div>
 </div>
 
@@ -3312,7 +3358,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">dmz-pre-08</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
               <td>Remove the rule, or extend it with a new change reference.</td>
             </tr>
             <tr>
@@ -3320,7 +3366,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Past its stated expiry date<br><span class="pill mono">EXPIRED_RULE</span></td>
               <td class="name">dmz-pre-19</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The description gives an expiry of 2026-06-13, 55 days ago, but the rule is still active.</td>
+              <td>The description gives an expiry of 2026-06-13, 74 days ago, but the rule is still active.</td>
               <td>Remove the rule, or extend it with a new change reference.</td>
             </tr>
             <tr>
@@ -3384,7 +3430,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-post-01</td>
               <td><span class="pill mono">DG-DMZ/post</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
               <td>Confirm whether the access is still needed before it lapses.</td>
             </tr>
             <tr>
@@ -3392,7 +3438,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-01</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
               <td>Confirm whether the access is still needed before it lapses.</td>
             </tr>
             <tr>
@@ -3408,7 +3454,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-06</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
               <td>Confirm whether the access is still needed before it lapses.</td>
             </tr>
             <tr>
@@ -3424,7 +3470,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-11</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
               <td>Confirm whether the access is still needed before it lapses.</td>
             </tr>
             <tr>
@@ -3440,7 +3486,7 @@ Resolves to 172.16.1.6/32">dmz-host-02</span></td><td class="objs"><span class="
               <td>Expires soon<br><span class="pill mono">EXPIRING_SOON</span></td>
               <td class="name">dmz-pre-16</td>
               <td><span class="pill mono">DG-DMZ/pre</span></td>
-              <td>The stated expiry is 2026-08-27, in 20 days.</td>
+              <td>The stated expiry is 2026-08-27, in 1 days.</td>
               <td>Confirm whether the access is still needed before it lapses.</td>
             </tr>
             <tr>

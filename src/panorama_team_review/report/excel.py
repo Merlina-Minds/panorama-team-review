@@ -643,6 +643,11 @@ def _write_inventory_gaps_sheet(
     sheet = book.add_worksheet("Inventory gaps")
     columns = [
         ("Kind", 16), ("Team", 22), ("Object", 46), ("Network", 20),
+        # What the team does have, and where that was read from: the row is a
+        # worklist entry, and without the source it says what is wrong without
+        # saying what to edit -- on an estate deriving its teams from address
+        # groups, the file to correct is not the inventory at all.
+        ("The team's networks", 34), ("Read from", 46),
         ("Also claimed by", 22), ("Their object", 46), ("What it means", 70),
     ]
     for index, (header, width) in enumerate(columns):
@@ -655,6 +660,7 @@ def _write_inventory_gaps_sheet(
     for row, gap in enumerate(bundle.inventory_gaps, start=1):
         values = [
             gap.kind, gap.team_id, gap.object_name, gap.network,
+            ", ".join(gap.team_networks), gap.team_source,
             gap.other_team or "", gap.other_object or "", gap.detail,
         ]
         for column, value in enumerate(values):

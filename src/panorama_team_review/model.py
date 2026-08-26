@@ -25,6 +25,9 @@ IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 DateRole = Literal["created", "changed", "expires", "reviewed", "unknown"]
 TicketField = Literal["description", "tag", "rule-name"]
 OutputFormat = Literal["html", "xlsx", "pdf", "json"]
+# The order a reader is offered the formats in: the page they are on, then the
+# two an owner forwards to somebody else, then the machine-readable record.
+FORMAT_READING_ORDER: tuple[str, ...] = ("html", "pdf", "xlsx", "json")
 OwnershipMethod = Literal["inventory", "tag", "regex", "device_group", "zone"]
 
 
@@ -567,6 +570,13 @@ class Team(BaseModel):
     name: str
     contact: str | None = None
     description: str = ""
+    origin: str = Field(
+        default="",
+        description="Where this team's networks come from, e.g. \"address group "
+        "'ngrp_aws_acme-p-01'\". Empty for a team written by hand into the inventory. "
+        "Reported with an inventory gap, because the thing to correct is the source, "
+        "not the team",
+    )
     assets: list[str] = Field(default_factory=list, description="CIDRs owned by this team")
     asset_labels: dict[str, str] = Field(
         default_factory=dict, description="CIDR -> human readable system name"
@@ -622,6 +632,15 @@ class InventoryGap(BaseModel):
     team_id: str = Field(description="The team the object's name points at")
     object_name: str
     network: str
+    team_networks: list[str] = Field(
+        default_factory=list, description="Every network the inventory does give that team"
+    )
+    team_source: str = Field(
+        default="",
+        description="What those networks were read from -- an address group, a tag, the "
+        "inventory file. This is the thing to correct, and naming it is the difference "
+        "between a gap somebody can close and one they can only look at",
+    )
     detail: str
     other_team: str | None = Field(
         default=None, description="For 'claimed-twice', the second team laying claim"
@@ -810,6 +829,47 @@ class TeamReport(BaseModel):
         return len(self.own_views)
 
 
+class OutputLinks(BaseModel):
+    """The files one run writes, named relative to the run directory.
+
+    The renderers have to link to each other -- a team's report to the same
+    team's PDF, the overview to every team's page -- and none of them can work
+    out a sibling's filename on its own: the templates are configurable, teams
+    are sampled, and a format that was not requested has no file to point at.
+    So the run decides every name once, up front, and hands the map to all of
+    them. A link is written only where this says a file exists.
+    """
+
+    index: str = "index.html"
+    combined: dict[str, str] = Field(
+        default_factory=dict, description="Format -> filename of the cross-team report"
+    )
+    teams: dict[str, dict[str, str]] = Field(
+        default_factory=dict, description="Team id -> format -> filename"
+    )
+
+    def combined_href(self, fmt: str = "html") -> str:
+        return self.combined.get(fmt, "")
+
+    def team_href(self, team_id: str, fmt: str = "html") -> str:
+        return self.teams.get(team_id, {}).get(fmt, "")
+
+    def team_formats(self, team_id: str, exclude: str = "") -> list[tuple[str, str]]:
+        """A team's other outputs, in reading order, as (format, filename)."""
+        return self._ordered(self.teams.get(team_id, {}), exclude)
+
+    def combined_formats(self, exclude: str = "") -> list[tuple[str, str]]:
+        return self._ordered(self.combined, exclude)
+
+    @staticmethod
+    def _ordered(files: dict[str, str], exclude: str) -> list[tuple[str, str]]:
+        return [
+            (fmt, files[fmt])
+            for fmt in FORMAT_READING_ORDER
+            if fmt in files and fmt != exclude
+        ]
+
+
 class ReportBundle(BaseModel):
     """Everything the renderers need: the full result of one tool run."""
 
@@ -833,3 +893,7 @@ class ReportBundle(BaseModel):
     stats: dict[str, int] = Field(default_factory=dict)
     hitcount_available: bool = False
     notes: list[str] = Field(default_factory=list)
+    outputs: OutputLinks = Field(
+        default_factory=OutputLinks,
+        description="The files this run writes, so every report can link to its siblings",
+    )

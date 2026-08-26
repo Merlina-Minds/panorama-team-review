@@ -210,10 +210,27 @@ format may not contain a path separator: a run directory is a single level.
 `pdf` requires the `[pdf]` extra and its system libraries; `validate` reports
 it as a problem if it is configured but unusable.
 
-When `html` is among the formats, each run also writes an `index.html` beside
-the reports — a table of contents linking to every team's report and the
-cross-team overview, so opening the run's directory lands on a page to click
-through rather than a bare file listing.
+### The index, and publishing the directory
+
+Every run writes an `index.html` beside its reports: a table of contents
+linking to every team's report and to the cross-team overview, so opening a run
+directory lands on a page to click through rather than a bare file listing. It
+is written whatever the formats are — a run that produced only spreadsheets
+still gets an index, listing them.
+
+With `timestamped_subdir`, the base directory holds nothing but dated run
+directories, which a web server answers with a file listing or a 403. So the
+base directory gets an `index.html` of its own: the newest run's overview as
+the way in, and every run still kept underneath it. It is rewritten after each
+run — after pruning, so it never links to a directory `keep_runs` has just
+removed. Publishing the review is then a matter of pointing a webroot at
+`output.directory`.
+
+The reports link to each other. A team's report offers the same report as PDF,
+Excel and JSON and nothing else — it is forwarded on its own, and a link to the
+cross-team overview would either be dead or show its recipient every other
+team's rules. The overview opens any team's report from the team table, in any
+format the run wrote.
 
 JSON output is written gzip-compressed, as `.json.gz`: the complete record
 repeats every rule once per team that sees it, so on a large estate it runs to
@@ -528,7 +545,7 @@ cross-team overview and as a worksheet in the combined workbook:
 
 | | Meaning |
 |---|---|
-| **A network the name assigns to a team the inventory does not give it** | Usually the account's address group is missing a member. Every rule touching that network is absent from the team's report until it is added. |
+| **A network the name assigns to a team the inventory does not give it** | Usually the account's address group is missing a member. Every rule touching that network is absent from the team's report until it is added. The row names the address group — or the inventory file — the team's networks were read from, which is the thing to edit. |
 | **A network two teams' names both claim** | Either the range was reassigned and the older object outlived it, or both describe the same addresses. A rule touching it is attributed to both, and neither attribution is the more trustworthy. |
 
 An object whose name points at a team that does not exist is *not* reported

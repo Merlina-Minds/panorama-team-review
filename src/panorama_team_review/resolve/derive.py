@@ -150,6 +150,7 @@ def _teams_from(collected: dict[str, _Accumulator]) -> list[Team]:
                 name=acc.name or team_id,
                 contact=acc.contact,
                 description=acc.describe(),
+                origin=acc.origin(),
                 assets=[str(n) for n in networks],
                 asset_labels=acc.labels_for(networks),
                 tags=sorted(acc.tags),
@@ -204,6 +205,20 @@ class _Accumulator:
     def describe(self) -> str:
         origin = ", ".join(sorted(self.sources)[:3])
         return f"Derived from {origin}" if origin else "Derived from naming convention"
+
+    def origin(self) -> str:
+        """What these networks were read from, in a form a sentence can quote.
+
+        Kept short and singular where it can be: the point of carrying it is
+        that a report about a wrong network can name the object to correct,
+        and "address group 'ngrp_aws_acme-p-01'" is that name.
+        """
+        sources = sorted(self.sources)
+        if not sources:
+            return "a naming convention"
+        if len(sources) == 1:
+            return sources[0]
+        return f"{sources[0]} and {len(sources) - 1} more"
 
     def labels_for(self, networks) -> dict[str, str]:
         """Keep only labels whose network survived collapsing."""
@@ -430,6 +445,10 @@ def merge_teams(explicit: list[Team], derived: list[Team]) -> tuple[list[Team], 
             existing.assets.extend(added)
             for cidr in added:
                 existing.asset_labels.setdefault(cidr, team.asset_labels.get(cidr, ""))
+            # Two sources now decide this team's networks, and an inventory gap
+            # against it has to name both -- correcting only the file would
+            # leave the group wrong, and only the group leaves the file wrong.
+            existing.origin = _both_origins(existing.origin, team.origin)
             notes.append(
                 f"team {team.id!r} is defined in the inventory; {len(added)} network(s) "
                 "found by a derive_teams rule were added to it"
@@ -441,6 +460,12 @@ def merge_teams(explicit: list[Team], derived: list[Team]) -> tuple[list[Team], 
             )
 
     return sorted(by_id.values(), key=lambda t: t.id), notes
+
+
+def _both_origins(explicit: str, derived: str) -> str:
+    """Name both places a merged team's networks came from, without repeating one."""
+    first = explicit or "the inventory file"
+    return first if not derived or derived == first else f"{first} and {derived}"
 
 
 def _same_tag(left: str, right: str, config: OwnershipConfig) -> bool:

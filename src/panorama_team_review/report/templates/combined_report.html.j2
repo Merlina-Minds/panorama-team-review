@@ -24,7 +24,16 @@
       <span><b>Tool:</b> panorama-team-review {{ bundle.meta.tool_version }}</span>
     </div>
 
+    {# The same overview in the other formats, and the way back to the run's
+       index. Both are one line, and both are the thing a reader reaches for
+       after the page has answered its question. #}
+    <div class="siblings">
+      <a class="format" href="{{ bundle.outputs.index }}">Index of this run</a>
+      {{ m.format_links(bundle.outputs.combined_formats("html"), formats, "This overview as") }}
+    </div>
+
     <nav class="jump" aria-label="Sections of this report">
+      <a href="#s-lookup">Find a network</a>
       <a href="#s-teams">Teams</a>
       {% if bundle.scopes %}<a href="#s-scopes">Policy blocks</a>{% endif %}
       {% if bundle.unassigned %}<a href="#s-unassigned">Rules without an owner</a>{% endif %}
@@ -60,6 +69,31 @@
   </div>
   {% endif %}
 
+  {# The question this page is most often opened with, and the one it could not
+     previously answer: an address turns up in a ticket -- whose is it? Every
+     other way of asking it means reading a table of two hundred teams. #}
+  <section class="block" id="s-lookup">
+    {{ m.section_heading("Which team owns a network?", "", "lookup") }}
+    <div class="collapsible" data-body="lookup">
+      <p class="lede">
+        Type an address or a CIDR — <span class="mono">10.243.48.0/25</span>, or a single host —
+        and every team whose inventory meets it is listed. A wider mask meets more of them, and
+        all are shown: a <span class="mono">/16</span> spanning eight accounts names eight teams,
+        which is the honest answer to who has to be asked.
+      </p>
+      <div class="controls">
+        <input type="search" id="net-lookup" autocomplete="off" spellcheck="false"
+               placeholder="10.243.48.0/25 · 10.243.48.17 · 2001:db8:1::/48"
+               aria-label="Find the team a network belongs to">
+        <button id="net-clear">Clear</button>
+        <span class="spacer"></span>
+        <span class="count" id="net-count"></span>
+      </div>
+      <div id="net-results" class="lookup-results" aria-live="polite"
+           data-unassigned="{{ '#s-unassigned' if bundle.unassigned else '' }}"></div>
+    </div>
+  </section>
+
   <section class="block" id="s-teams">
     {{ m.section_heading("Teams", bundle.teams | length, "teams") }}
     <div class="collapsible" data-body="teams">
@@ -77,11 +111,20 @@
             <th class="num">Inbound</th><th class="num">Outbound</th><th class="num">Both ends</th>
             <th class="num">No direction</th><th class="num">Own total</th>
             <th class="num">Also covers</th><th class="num">Findings</th><th>Worst</th>
+            <th>Report</th>
           </tr></thead>
           <tbody>
           {% for team_report in bundle.teams %}
+            {% set files = bundle.outputs.teams.get(team_report.team.id, {}) %}
             <tr>
-              <td class="name">{{ team_report.team.name }}<br><span class="pill mono">{{ team_report.team.id }}</span></td>
+              {# The name is the link, because it is what a reader aims at. A team
+                 whose report this run did not write -- sampled out, or filtered
+                 away -- keeps the plain name rather than a link to a 404. #}
+              <td class="name">
+                {% if files.html %}<a href="{{ files.html }}">{{ team_report.team.name }}</a>
+                {%- else %}{{ team_report.team.name }}{% endif %}
+                <br><span class="pill mono">{{ team_report.team.id }}</span>
+              </td>
               <td>{{ team_report.team.contact or "—" }}</td>
               <td class="num">{{ team_report.team.assets | length }}</td>
               <td class="num">{{ team_report.own("inbound") | length }}</td>
@@ -99,6 +142,7 @@
                 {%- elif worst %}{{ m.severity_badge("info") }}
                 {%- else %}<span class="pill">none</span>{% endif %}
               </td>
+              <td>{{ m.format_links(bundle.outputs.team_formats(team_report.team.id), formats, "") }}</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -202,18 +246,32 @@
         <span class="count-badge">{{ outside | length }}</span></h3>
       <p class="lede">
         Usually the team's address group is missing a member. Every rule touching the network is
-        absent from that team's report until it is added.
+        absent from that team's report until it is added — so the last column names the thing to
+        edit: the address group, or the inventory file, whichever this team's networks were read
+        from. Several rows often close with one edit, when a missing VPC brings its subnets with
+        it.
       </p>
       <div class="table-scroll{{ ' capped' if outside | length > 12 }}">
         <table>
-          <thead><tr><th>Team</th><th>Object</th><th>Network</th><th>The team's networks</th></tr></thead>
+          <thead><tr>
+            <th>Team</th><th>Object</th><th>Network</th>
+            <th>The team's networks</th><th>Read from</th>
+          </tr></thead>
           <tbody>
           {% for gap in outside %}
             <tr>
-              <td class="name">{{ gap.team_id }}</td>
+              <td class="name">
+                {% set files = bundle.outputs.teams.get(gap.team_id, {}) %}
+                {% if files.html %}<a href="{{ files.html }}">{{ gap.team_id }}</a>
+                {%- else %}{{ gap.team_id }}{% endif %}
+              </td>
               <td class="mono">{{ gap.object_name }}</td>
               <td class="addr">{{ gap.network }}</td>
-              <td class="addr">{{ gap.detail.split(" holds ")[1].split(" -- ")[0] }}</td>
+              <td class="addr">
+                {{- gap.team_networks[:4] | join(", ") or "nothing" -}}
+                {%- if gap.team_networks | length > 4 %} and {{ gap.team_networks | length - 4 }} more{% endif -%}
+              </td>
+              <td class="mono">{{ gap.team_source }}</td>
             </tr>
           {% endfor %}
           </tbody>
@@ -305,6 +363,12 @@
   </footer>
 </div>
 
+{# Every team's networks, for the lookup above. A data block rather than a
+   fetch: these reports are read from disk, where fetching a sibling file is
+   blocked, and from a web server, where it would be a second request for
+   something the page already had. #}
+<script type="application/json" id="team-networks">{{ team_networks }}</script>
+
 <script>
 (function () {
   "use strict";
@@ -371,6 +435,272 @@
     button.setAttribute("aria-expanded", open ? "false" : "true");
     button.textContent = open ? "details" : "hide";
   });
+
+  // --- which team owns a network ----------------------------------------
+  //
+  // Address arithmetic in the page, not an answer table prepared while
+  // rendering: the question is asked about an arbitrary prefix, and there is no
+  // finite set of those to precompute. BigInt spans v4 and v6 in one code path,
+  // and a few hundred teams with a handful of networks each is a few thousand
+  // integer comparisons per keystroke -- below the threshold of noticing.
+  var lookupBox = document.getElementById("net-lookup");
+  var lookupOut = document.getElementById("net-results");
+  var lookupCount = document.getElementById("net-count");
+  var lookupClear = document.getElementById("net-clear");
+  var teams = [];
+  var payload = document.getElementById("team-networks");
+  if (payload) {
+    try { teams = JSON.parse(payload.textContent) || []; } catch (err) { teams = []; }
+  }
+
+  function readV4(text) {
+    var parts = text.split(".");
+    if (parts.length !== 4) return null;
+    var value = 0n;
+    for (var i = 0; i < 4; i++) {
+      if (!/^[0-9]{1,3}$/.test(parts[i])) return null;
+      var octet = parseInt(parts[i], 10);
+      if (octet > 255) return null;
+      value = (value << 8n) | BigInt(octet);
+    }
+    return value;
+  }
+
+  function readV6(text) {
+    // An embedded v4 tail (::ffff:10.1.2.3) becomes the two groups it stands
+    // for, so the rest of the parser only ever sees hextets.
+    var dot = text.lastIndexOf(".");
+    if (dot >= 0) {
+      var cut = text.lastIndexOf(":", dot);
+      if (cut < 0) return null;
+      var embedded = readV4(text.slice(cut + 1));
+      if (embedded === null) return null;
+      text = text.slice(0, cut + 1) + ((embedded >> 16n) & 0xffffn).toString(16) +
+             ":" + (embedded & 0xffffn).toString(16);
+    }
+    var halves = text.split("::");
+    if (halves.length > 2) return null;
+    var head = halves[0] ? halves[0].split(":") : [];
+    var groups;
+    if (halves.length === 1) {
+      groups = head;
+    } else {
+      var tail = halves[1] ? halves[1].split(":") : [];
+      var fill = 8 - head.length - tail.length;
+      if (fill < 1) return null;
+      groups = head.concat(new Array(fill).fill("0"), tail);
+    }
+    if (groups.length !== 8) return null;
+    var value = 0n;
+    for (var g = 0; g < 8; g++) {
+      if (!/^[0-9a-fA-F]{1,4}$/.test(groups[g])) return null;
+      value = (value << 16n) | BigInt(parseInt(groups[g], 16));
+    }
+    return value;
+  }
+
+  function showV4(value) {
+    var parts = [];
+    for (var shift = 24n; shift >= 0n; shift -= 8n) parts.push(((value >> shift) & 0xffn).toString(10));
+    return parts.join(".");
+  }
+
+  function showV6(value) {
+    var groups = [];
+    for (var shift = 112n; shift >= 0n; shift -= 16n) groups.push(((value >> shift) & 0xffffn).toString(16));
+    // The longest run of zero groups becomes "::" -- counted over the groups,
+    // never searched for in the joined text: "2001:db8:20:0:0:0:0:5" contains
+    // the string "0:0:0:0" starting inside "20", and collapsing there would
+    // silently answer about a different address.
+    var runAt = -1, runLength = 0, start = -1, length = 0;
+    for (var i = 0; i < 8; i++) {
+      if (groups[i] !== "0") { length = 0; continue; }
+      if (length === 0) start = i;
+      length++;
+      if (length > runLength) { runLength = length; runAt = start; }
+    }
+    if (runLength < 2) return groups.join(":");
+    return groups.slice(0, runAt).join(":") + "::" + groups.slice(runAt + runLength).join(":");
+  }
+
+  // A network as a closed range of addresses. Host bits are dropped, so
+  // 10.20.30.40/24 is read as the 10.20.30.0/24 the person meant.
+  function parseNet(text) {
+    text = (text || "").trim();
+    if (!text) return null;
+    var slash = text.indexOf("/");
+    var addr = slash < 0 ? text : text.slice(0, slash);
+    var six = addr.indexOf(":") >= 0;
+    var width = six ? 128 : 32;
+    var value = six ? readV6(addr) : readV4(addr);
+    if (value === null) return null;
+    var prefix = width;
+    if (slash >= 0) {
+      var written = text.slice(slash + 1);
+      if (!/^[0-9]{1,3}$/.test(written)) return null;
+      prefix = parseInt(written, 10);
+      if (prefix > width) return null;
+    }
+    var host = BigInt(width - prefix);
+    var start = (value >> host) << host;
+    return {
+      start: start,
+      end: start + ((1n << host) - 1n),
+      prefix: prefix,
+      version: six ? 6 : 4,
+      label: (six ? showV6(start) : showV4(start)) + "/" + prefix
+    };
+  }
+
+  function netsOf(team) {
+    if (!team.parsed) {
+      team.parsed = (team.nets || []).map(parseNet).filter(Boolean);
+    }
+    return team.parsed;
+  }
+
+  function cell(row, text, className) {
+    var td = document.createElement("td");
+    if (className) td.className = className;
+    td.textContent = text;
+    row.appendChild(td);
+    return td;
+  }
+
+  function note(text, href, linkText) {
+    var para = document.createElement("p");
+    para.className = "lede";
+    para.textContent = text;
+    if (href) {
+      para.appendChild(document.createTextNode(" "));
+      var link = document.createElement("a");
+      link.href = href;
+      link.textContent = linkText;
+      para.appendChild(link);
+    }
+    return para;
+  }
+
+  function lookup() {
+    if (!lookupOut) return;
+    lookupOut.textContent = "";
+    if (lookupCount) lookupCount.textContent = "";
+    var query = lookupBox ? lookupBox.value.trim() : "";
+    if (!query) return;
+
+    var wanted = parseNet(query);
+    if (!wanted) {
+      lookupOut.appendChild(note("Not an address or a network: type 10.243.48.0/25, 10.243.48.17 or 2001:db8:1::/48.", "", ""));
+      return;
+    }
+
+    var hits = [];
+    teams.forEach(function (team) {
+      var meeting = [];
+      var rank = 3;
+      netsOf(team).forEach(function (found) {
+        if (found.version !== wanted.version) return;
+        if (found.start > wanted.end || wanted.start > found.end) return;
+        var covers = found.start <= wanted.start && found.end >= wanted.end;
+        var inside = wanted.start <= found.start && wanted.end >= found.end;
+        var how = covers && inside ? 0 : (covers ? 1 : 2);
+        meeting.push({ range: found, how: how });
+        if (how < rank) rank = how;
+      });
+      if (!meeting.length) return;
+      // Within a team: the closest relation first, and among equals the most
+      // specific network -- except for the ones that merely fall inside a wide
+      // query, which read as an address plan and so go in address order.
+      meeting.sort(function (first, second) {
+        if (first.how !== second.how) return first.how - second.how;
+        if (first.how === 2) return first.range.start < second.range.start ? -1 : 1;
+        return second.range.prefix - first.range.prefix;
+      });
+      hits.push({ team: team, rank: rank, meeting: meeting });
+    });
+
+    // Exact match first, then the networks that contain the query -- most
+    // specific first, since that is the team who actually runs it, not the one
+    // holding the site supernet around it. Teams that merely fall inside a wide
+    // query come last, in address order: sorted by specificity they would lead
+    // with whoever happens to own the smallest fragment, and a /13 answered by
+    // a hundred accounts is read as an address plan.
+    hits.sort(function (a, b) {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      if (a.rank === 2 && a.meeting[0].range.start !== b.meeting[0].range.start) {
+        return a.meeting[0].range.start < b.meeting[0].range.start ? -1 : 1;
+      }
+      return b.meeting[0].range.prefix - a.meeting[0].range.prefix ||
+             a.team.name.localeCompare(b.team.name);
+    });
+
+    if (lookupCount) {
+      lookupCount.textContent = hits.length === 1
+        ? "1 team meets " + wanted.label
+        : hits.length + " teams meet " + wanted.label;
+    }
+
+    if (!hits.length) {
+      lookupOut.appendChild(note(
+        "No team's inventory meets " + wanted.label + ". Rules touching it reach nobody — they are in",
+        lookupOut.getAttribute("data-unassigned") || "",
+        "Rules without an owner."));
+      return;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "table-scroll" + (hits.length > 12 ? " capped" : "");
+    var table = document.createElement("table");
+    // The relation is the team's closest one, and the networks are listed
+    // closest first, so the word and the first address in the row agree.
+    table.innerHTML = "<thead><tr><th>Team</th><th>Contact</th><th>Its networks</th>" +
+                      "<th>Closest match</th><th class=\"num\">Own rules</th></tr></thead>";
+    var body = document.createElement("tbody");
+
+    hits.slice(0, 100).forEach(function (hit) {
+      var row = document.createElement("tr");
+      var name = document.createElement("td");
+      name.className = "name";
+      if (hit.team.href) {
+        var link = document.createElement("a");
+        link.href = hit.team.href;
+        link.textContent = hit.team.name;
+        name.appendChild(link);
+      } else {
+        name.appendChild(document.createTextNode(hit.team.name));
+      }
+      name.appendChild(document.createElement("br"));
+      var id = document.createElement("span");
+      id.className = "pill mono";
+      id.textContent = hit.team.id;
+      name.appendChild(id);
+      row.appendChild(name);
+
+      cell(row, hit.team.contact || "—");
+      cell(row, hit.meeting.slice(0, 4).map(function (met) { return met.range.label; }).join(", ") +
+                (hit.meeting.length > 4 ? " and " + (hit.meeting.length - 4) + " more" : ""), "addr");
+      cell(row, hit.rank === 0 ? "exactly this network"
+                : (hit.rank === 1 ? "contains it" : "lies inside it"));
+      cell(row, String(hit.team.own), "num");
+      body.appendChild(row);
+    });
+
+    table.appendChild(body);
+    wrap.appendChild(table);
+    lookupOut.appendChild(wrap);
+    if (hits.length > 100) {
+      lookupOut.appendChild(note("Showing the first 100 of " + hits.length + ".", "", ""));
+    }
+  }
+
+  if (lookupBox) lookupBox.addEventListener("input", lookup);
+  if (lookupClear) {
+    lookupClear.addEventListener("click", function () {
+      if (lookupBox) lookupBox.value = "";
+      lookup();
+      if (lookupBox) lookupBox.focus();
+    });
+  }
 })();
 </script>
 </body>

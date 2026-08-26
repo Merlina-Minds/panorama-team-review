@@ -299,6 +299,29 @@ def test_derived_networks_are_added_to_an_explicit_team():
     assert merged[0].name == "Shop"
 
 
+def test_a_derived_team_records_the_group_its_networks_came_from():
+    """An inventory gap has to name the thing to edit, and here that is a group."""
+    snap = snapshot(
+        addresses=[address("net-a", "10.1.0.0/24")],
+        address_groups=[AddressGroup(name="ngrp-shop-p-01", members=["net-a"], location=loc())],
+    )
+    result = run(snap, DerivedTeamRule(
+        id="groups", source="address-group",
+        pattern=r"^ngrp-(?P<app>[a-z]+)-p-01$", team_id="{app}-p",
+    ))
+    assert result.teams[0].origin == "address group 'ngrp-shop-p-01'"
+
+
+def test_a_merged_team_names_both_places_its_networks_came_from():
+    """Correcting only the file would leave the group wrong, and the reverse."""
+    explicit = [Team(id="shop", name="Shop", origin="the inventory file", assets=["10.1.0.0/16"])]
+    derived = [Team(id="shop", name="shop", origin="address group 'ngrp-shop'",
+                    assets=["10.9.9.0/24"])]
+
+    merged, _ = merge_teams(explicit, derived)
+    assert merged[0].origin == "the inventory file and address group 'ngrp-shop'"
+
+
 def test_derived_only_teams_are_kept():
     merged, _ = merge_teams([], [Team(id="a", name="A", assets=["10.1.0.0/16"])])
     assert [team.id for team in merged] == ["a"]

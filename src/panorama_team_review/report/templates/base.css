@@ -135,6 +135,7 @@ header.report.compact { padding: 0.5rem 0 0.4rem; }
 header.report.compact h1 { font-size: 1rem; display: inline; margin-right: 0.6rem; }
 header.report.compact .subject { display: inline; font-size: 0.9rem; margin-bottom: 0; }
 header.report.compact .provenance { display: none; }
+header.report.compact .siblings { display: none; }
 header.report.compact nav.jump { margin-top: 0.35rem; }
 
 .provenance {
@@ -146,6 +147,42 @@ header.report.compact nav.jump { margin-top: 0.35rem; }
 }
 
 .provenance b { font-weight: 600; color: var(--ink-secondary); }
+
+/* --- the same document, in its other formats ----------------------------- */
+
+/* One review is four files: a page, a PDF, a workbook, a JSON record. The links
+ * between them are deliberately quiet -- small outlined pills under the title,
+ * never a toolbar. Nobody opens a report in order to change its format; they do
+ * it afterwards, to forward what they just read. */
+
+.siblings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.formats {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.formats-label { font-size: 0.78rem; color: var(--ink-muted); }
+
+a.format {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--baseline);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+a.format:hover { border-color: var(--link); color: var(--link); }
 
 /* --- jump navigation ----------------------------------------------------- */
 
@@ -287,6 +324,12 @@ a.tile:hover .tile-go { color: var(--accent); }
 
 .controls .spacer { flex: 1 1 auto; }
 .controls .count { font-size: 0.85rem; color: var(--ink-muted); }
+
+/* The address lookup answers into this. It is empty until something is typed:
+ * an empty result table under an empty box reads as "no team owns anything". */
+.lookup-results:empty { display: none; }
+.lookup-results { margin-top: 0.75rem; }
+.lookup-results .lede { margin: 0.25rem 0 0; }
 
 /* --- parts -------------------------------------------------------------- */
 

@@ -66,6 +66,7 @@ class TeamEntry(BaseModel):
             name=self.name or self.id,
             contact=self.contact,
             description=self.description,
+            origin="the inventory file",
             assets=[asset.cidr for asset in self.assets],
             asset_labels={asset.cidr: asset.label for asset in self.assets if asset.label},
             tags=self.tags,

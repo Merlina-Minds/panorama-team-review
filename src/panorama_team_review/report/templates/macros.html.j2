@@ -330,3 +330,47 @@
   {% endif %}
 </section>
 {% endmacro %}
+
+{#
+  The same document in the formats it was also written in.
+
+  A report is read on screen and then passed on -- as a PDF to a change board,
+  as a spreadsheet to whoever keeps the exception list -- and the person who
+  needs the other format is the one already looking at this one. `files` comes
+  from the run's link map, so a format that was not rendered is not offered.
+#}
+{% macro format_links(files, labels, lead="Also as") %}
+{% if files %}
+<span class="formats">
+  {%- if lead %}<span class="formats-label">{{ lead }}</span>{% endif -%}
+  {%- for fmt, name in files %}<a class="format" href="{{ name }}">{{ labels.get(fmt, fmt) }}</a>{% endfor -%}
+</span>
+{% endif %}
+{% endmacro %}
+
+{#
+  The collapse behaviour of a section heading, for the two index pages.
+
+  The team and overview reports carry their own, larger script; these pages
+  need only this, and without it the chevron on every heading is a button that
+  does nothing -- which is worse than not drawing one.
+#}
+{% macro collapse_script() %}
+<script>
+(function () {
+  "use strict";
+  document.querySelectorAll("button.collapse").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var body = document.querySelector(
+        '.collapsible[data-body="' + button.getAttribute("data-collapse") + '"]');
+      if (!body) return;
+      var collapsed = button.getAttribute("aria-expanded") === "true";
+      body.classList.toggle("hidden", collapsed);
+      button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      var head = button.closest(".section-head");
+      if (head) head.classList.toggle("collapsed", collapsed);
+    });
+  });
+})();
+</script>
+{% endmacro %}

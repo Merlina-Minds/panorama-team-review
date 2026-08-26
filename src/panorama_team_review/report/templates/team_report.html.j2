@@ -46,6 +46,15 @@
       <span><b>Tool:</b> panorama-team-review {{ bundle.meta.tool_version }}</span>
     </div>
 
+    {# The same report in the other formats, and nothing else: this file is
+       forwarded on its own -- mailed, put on a share -- and a link to the
+       cross-team overview would either be dead or show its recipient every
+       other team's rules. Their own PDF and spreadsheet travel with them. #}
+    {% set siblings = bundle.outputs.team_formats(report.team.id, "html") %}
+    {% if siblings %}
+    <div class="siblings">{{ m.format_links(siblings, formats, "This report as") }}</div>
+    {% endif %}
+
     {% if report.rule_count or report.team.assets %}
     <nav class="jump" aria-label="Sections of this report">
       {% if report.team.assets %}<a href="#s-networks">Your networks</a>{% endif %}

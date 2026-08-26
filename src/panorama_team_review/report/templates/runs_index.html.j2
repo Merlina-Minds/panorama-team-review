@@ -1,0 +1,79 @@
+{% import "macros.html.j2" as m %}<!doctype html>
+<html lang="{{ config.report.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ config.report.title }} — Reports</title>
+<style>{{ css }}</style>
+</head>
+<body>
+<a id="top"></a>
+
+{#
+  The page above the runs. Dated run directories make the reports folder
+  something a web server answers with a file listing or a 403, which is a poor
+  thing to hand a colleague -- so the folder gets a front door: the newest
+  overview as the way in, and every run still kept underneath it.
+#}
+{% set latest = runs[0] if runs else none %}
+
+<header class="report" id="page-header">
+  <div class="wrap">
+    <h1>{{ config.report.title }}</h1>
+    <div class="subject">Firewall rule reviews{% if config.report.organisation %} · {{ config.report.organisation }}{% endif %}</div>
+    {% if latest %}
+    <div class="provenance">
+      <span><b>Latest run:</b> {{ latest.when.strftime("%Y-%m-%d %H:%M") }}</span>
+      <span><b>Runs kept:</b> {{ runs | length }}</span>
+    </div>
+    {% endif %}
+  </div>
+</header>
+
+<div class="wrap">
+
+  {% if latest %}
+  <div class="tiles">
+    {% if latest.overview %}
+    {{ m.tile("Open", "Latest overview", "Every team on one page, and the network lookup", "", latest.name ~ "/" ~ latest.overview) }}
+    {% endif %}
+    {{ m.tile("Open", "Latest index", "Every team's report of " ~ latest.when.strftime("%Y-%m-%d"), "", latest.index) }}
+    {{ m.tile(runs | length, "Runs kept", "Older reviews, for comparison", "", "#s-runs") }}
+  </div>
+  {% endif %}
+
+  <section class="block" id="s-runs">
+    {{ m.section_heading("Runs", runs | length, "runs") }}
+    <div class="collapsible" data-body="runs">
+      <p class="lede">
+        One directory per run, newest first. Each holds the reports of that day: the overview
+        for the firewall team, and one report per team. Older runs are kept so a review can be
+        compared with the one before it — how many are kept is <span class="mono">output.keep_runs</span>.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Run</th><th>Directory</th><th>Reports</th></tr></thead>
+          <tbody>
+          {% for run in runs %}
+            <tr>
+              <td class="name">{{ run.when.strftime("%Y-%m-%d %H:%M") }}{% if loop.first %} <span class="pill">latest</span>{% endif %}</td>
+              <td class="mono">{{ run.name }}</td>
+              <td>
+                <span class="formats">
+                  <a class="format" href="{{ run.index }}">Index</a>
+                  {%- if run.overview %}<a class="format" href="{{ run.name }}/{{ run.overview }}">Overview</a>{% endif -%}
+                </span>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+{{ m.collapse_script() }}
+</body>
+</html>

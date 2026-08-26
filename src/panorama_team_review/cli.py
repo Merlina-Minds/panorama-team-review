@@ -39,7 +39,7 @@ from .errors import (
 from .model import OutputFormat, ReportBundle, Snapshot, TeamReport
 from .parse import panos
 from .parse.loader import find_backups, load
-from .report import batch, html, pdf
+from .report import batch, html, links, pdf
 from .report import build as report_build
 from .resolve.inventory import load_inventory
 
@@ -47,9 +47,6 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_CONFIG = 2
 EXIT_NO_BACKUP = 3
-
-# File extension per output format; only JSON differs, since it is gzipped.
-_EXTENSIONS = {"json": "json.gz"}
 
 
 class Context:
@@ -215,6 +212,9 @@ def run(
         sys.exit(EXIT_ERROR)
 
     _prune_old_runs(ctx)
+    root = _write_webroot_index(ctx)
+    if root:
+        written.append(root)
 
     if written:
         ctx.say(f"Wrote {len(written)} file(s) to {written[0].parent}")
@@ -287,9 +287,6 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
         directory = directory / bundle.generated_at.strftime(config.output.timestamped_subdir_format)
     directory.mkdir(parents=True, exist_ok=True)
 
-    stamp = bundle.generated_at.strftime("%Y-%m-%d")
-    formats = set(config.output.formats)
-
     # Sampling happens here rather than by cutting the inventory down before
     # the run, and the difference matters: ownership is resolved against every
     # team at once -- who owns the far side of a connection, how many 'any'
@@ -304,39 +301,26 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
             + ", ".join(report.team.id for report in per_team)
         )
 
+    # Every file this run writes is named before anything is rendered, and the
+    # map travels with the bundle: a report can then link to its own PDF and to
+    # every other team's page, neither of which a renderer could name from
+    # inside a worker process.
+    bundle.outputs = links.plan(config, bundle.generated_at, per_team)
+
     # Every output file is one job: (team index or COMBINED, format, path). They
     # are handed to the batch writer, which renders them across worker processes
     # when the volume justifies it. Heavy formats and the combined document come
-    # first so they start on the first free workers instead of tailing the run,
-    # and the file extension matches the format name (JSON is written gzipped).
-    active = [fmt for fmt in ("xlsx", "pdf", "html", "json") if fmt in formats]
+    # first so they start on the first free workers instead of tailing the run.
     position = {id(report): index for index, report in enumerate(bundle.teams)}
-    jobs: list[batch.Job] = []
-
-    # An index.html links the HTML reports together, so opening the run's
-    # directory lands on a table of contents rather than a file listing.
-    want_index = "html" in formats
-    index_entries: list[tuple[TeamReport, str]] = []
-    overview_href: str | None = None
-
-    if config.output.combined:
-        stem = config.output.combined_filename_template.format(date=stamp)
-        for fmt in active:
-            jobs.append((batch.COMBINED, fmt, directory / f"{stem}.{_EXTENSIONS.get(fmt, fmt)}"))
-        if want_index:
-            overview_href = f"{stem}.html"
-
-    if config.output.per_team:
-        for report in per_team:
-            stem = config.output.filename_template.format(
-                date=stamp, team_id=_safe(report.team.id), team_name=_safe(report.team.name)
-            )
-            for fmt in active:
-                jobs.append(
-                    (position[id(report)], fmt, directory / f"{stem}.{_EXTENSIONS.get(fmt, fmt)}")
-                )
-            if want_index:
-                index_entries.append((report, f"{stem}.html"))
+    jobs: list[batch.Job] = [
+        (batch.COMBINED, fmt, directory / name)
+        for fmt, name in links.in_render_order(bundle.outputs.combined)
+    ]
+    for report in per_team:
+        jobs.extend(
+            (position[id(report)], fmt, directory / name)
+            for fmt, name in links.in_render_order(bundle.outputs.teams.get(report.team.id, {}))
+        )
 
     if not jobs:
         return []
@@ -354,10 +338,11 @@ def _write_outputs(ctx: Context, bundle: ReportBundle, sample: int | None = None
 
     written = batch.write_all(bundle, jobs, config, progress=report_progress)
 
-    if want_index and (index_entries or overview_href):
-        written.append(
-            html.write_index(bundle, config, directory / "index.html", index_entries, overview_href)
-        )
+    # The index is written whatever the formats are. It is the entry point of
+    # the directory -- the file a web server serves for the folder, and the one
+    # place that lists every team -- and a run that produced only spreadsheets
+    # still needs one, or the directory is a file listing again.
+    written.append(html.write_index(bundle, config, directory / bundle.outputs.index, per_team))
 
     return written
 
@@ -470,8 +455,60 @@ def _prune_old_runs(ctx: Context) -> None:
     if not base.is_dir():
         return
 
-    fmt = ctx.config.output.timestamped_subdir_format
-    runs = sorted(
+    for _, stale in _dated_runs(base, ctx.config.output.timestamped_subdir_format)[keep:]:
+        ctx.detail(f"removing old run directory {stale}")
+        shutil.rmtree(stale, ignore_errors=True)
+
+
+def _write_webroot_index(ctx: Context) -> Path | None:
+    """Give the reports directory itself an entry point, when runs are dated.
+
+    A dated run writes its own directory and its own index, which leaves the
+    directory somebody actually publishes holding nothing but those -- so
+    pointing a web server at it produces a file listing, or a 403. The root
+    therefore gets a page of its own: the newest run's overview as the way in,
+    and every run still kept underneath it. Rewritten after each run, and after
+    pruning, so it never links to a directory that has just been removed.
+    """
+    output = ctx.config.output
+    if not output.timestamped_subdir or not output.directory.is_dir():
+        # Without dated subdirectories the run directory *is* the root, and it
+        # already holds the index that lists the run.
+        return None
+
+    runs = _dated_runs(output.directory, output.timestamped_subdir_format)
+    entries = [
+        html.RunEntry(
+            name=path.name,
+            when=when,
+            index=f"{path.name}/{links.INDEX_NAME}",
+            overview=_overview_in(path, output.combined_filename_template),
+        )
+        for when, path in runs
+        if (path / links.INDEX_NAME).is_file()
+    ]
+    if not entries:
+        return None
+
+    path = output.directory / links.INDEX_NAME
+    ctx.detail(f"writing {path}")
+    return html.write_runs_index(ctx.config, path, entries)
+
+
+def _overview_in(run: Path, template: str) -> str:
+    """The cross-team report inside a run directory, by name, if it wrote one.
+
+    Found by globbing rather than remembered: the root index also lists runs
+    from earlier invocations, whose date -- and whose configuration -- this
+    process never saw.
+    """
+    matches = sorted(run.glob(template.format(date="*") + ".html"))
+    return matches[-1].name if matches else ""
+
+
+def _dated_runs(base: Path, fmt: str) -> list[tuple[datetime, Path]]:
+    """Every run directory under ``base``, newest first."""
+    return sorted(
         (
             (parsed, path)
             for path in base.iterdir()
@@ -480,9 +517,6 @@ def _prune_old_runs(ctx: Context) -> None:
         key=lambda item: item[0],
         reverse=True,
     )
-    for _, stale in runs[keep:]:
-        ctx.detail(f"removing old run directory {stale}")
-        shutil.rmtree(stale, ignore_errors=True)
 
 
 def _run_dir_time(name: str, fmt: str) -> datetime | None:
@@ -491,12 +525,6 @@ def _run_dir_time(name: str, fmt: str) -> datetime | None:
         return datetime.strptime(name, fmt)
     except ValueError:
         return None
-
-
-def _safe(value: str) -> str:
-    """Make a string safe for a filename on every supported platform."""
-    cleaned = "".join(char if char.isalnum() or char in "-_." else "-" for char in value)
-    return cleaned.strip("-") or "team"
 
 
 # ---------------------------------------------------------------------------

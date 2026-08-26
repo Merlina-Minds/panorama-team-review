@@ -181,11 +181,62 @@ def test_run_writes_an_html_index(runner, estate):
     assert f'{OVERVIEW_MARK}.html"' in body
 
 
-def test_run_without_html_writes_no_index(runner, estate):
-    """The index is a table of contents for the HTML reports; JSON-only has none."""
-    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run"])
+def test_run_without_html_still_writes_an_index(runner, estate):
+    """The index is the entry point of the directory, not a feature of one format.
+
+    A run that produced only spreadsheets still needs the file a web server
+    serves for the folder -- and it links to the spreadsheets."""
+    result = runner.invoke(main, ["-c", str(estate / "config.yaml"), "run", "-f", "xlsx"])
     assert result.exit_code == EXIT_OK
-    assert not (estate / "reports" / "index.html").exists()
+    body = (estate / "reports" / "index.html").read_text(encoding="utf-8")
+    assert 'platform_firewall-review.xlsx"' in body
+    assert ".html\"" not in body
+
+
+def test_run_writes_a_webroot_index_above_the_dated_runs(runner, estate):
+    """Point a web server at the reports directory and it has a front door.
+
+    With dated run directories the base directory holds nothing else, so
+    publishing it produces a file listing or a 403 rather than a report."""
+    config = estate / "config.yaml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "timestamped_subdir: false", "timestamped_subdir: true"
+        ),
+        encoding="utf-8",
+    )
+    result = runner.invoke(main, ["-c", str(config), "run", "-f", "html"])
+    assert result.exit_code == EXIT_OK
+
+    runs = [p for p in (estate / "reports").iterdir() if p.is_dir()]
+    assert len(runs) == 1
+    overview = next(p for p in runs[0].glob(f"*{OVERVIEW_MARK}.html"))
+    body = (estate / "reports" / "index.html").read_text(encoding="utf-8")
+    assert f'href="{runs[0].name}/index.html"' in body
+    assert f'href="{runs[0].name}/{overview.name}"' in body
+
+
+def test_the_webroot_index_never_links_a_pruned_run(runner, estate):
+    """It is written after pruning, or it points at a directory just deleted."""
+    config = estate / "config.yaml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "timestamped_subdir: false",
+            "timestamped_subdir: true\n"
+            "  timestamped_subdir_format: '%Y-%m-%d_%H-%M-%S'\n"
+            "  keep_runs: 1",
+        ),
+        encoding="utf-8",
+    )
+    stale = estate / "reports" / "2020-01-01_00-00-00"
+    stale.mkdir(parents=True)
+    (stale / "index.html").write_text("old", encoding="utf-8")
+
+    result = runner.invoke(main, ["-c", str(config), "run", "-f", "html"])
+    assert result.exit_code == EXIT_OK
+    assert not stale.exists()
+    body = (estate / "reports" / "index.html").read_text(encoding="utf-8")
+    assert "2020-01-01_00-00-00" not in body
 
 
 def test_run_output_override(runner, estate, tmp_path):

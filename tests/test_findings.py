@@ -494,8 +494,11 @@ def test_the_finding_names_the_editor_and_the_date():
 # ---------------------------------------------------------------------------
 
 
-def _gaps(objects, teams, patterns):
-    """objects: [(name, cidr)], teams: {id: [cidr]}, patterns: [(regex, team_id)]."""
+def _gaps(objects, teams, patterns, origins=None):
+    """objects: [(name, cidr)], teams: {id: [cidr]}, patterns: [(regex, team_id)].
+
+    ``origins`` says where each team's networks were read from, as a derived
+    team records it -- the address group, or the inventory file."""
     from datetime import datetime
 
     from panorama_team_review.analyze.inventory_gaps import find_inventory_gaps
@@ -519,7 +522,10 @@ def _gaps(objects, teams, patterns):
     )
     return find_inventory_gaps(
         snapshot,
-        [Team(id=tid, name=tid, assets=assets) for tid, assets in teams.items()],
+        [
+            Team(id=tid, name=tid, assets=assets, origin=(origins or {}).get(tid, ""))
+            for tid, assets in teams.items()
+        ],
         [ObjectNamingRule(pattern=p, team_id=t) for p, t in patterns],
     )
 
@@ -539,6 +545,24 @@ def test_an_object_outside_its_teams_networks_is_reported():
     assert gaps[0].team_id == "payments-p"
     assert gaps[0].network == "10.20.99.0/24"
     assert "10.20.12.0/22" in gaps[0].detail
+
+
+def test_a_gap_names_the_object_its_teams_networks_were_read_from():
+    """The fix is an edit, and the row has to say to what.
+
+    On an estate deriving its teams from address groups, "the inventory" is not
+    a file anybody can open: the networks came from a group in the firewall
+    configuration, and naming it is the difference between a gap somebody can
+    close and one they can only look at."""
+    gaps = _gaps(
+        objects=[("net-prod-payments-database-10.20.99.0-24", "10.20.99.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+        origins={"payments-p": "address group 'ngrp-payments-p-01'"},
+    )
+    assert gaps[0].team_source == "address group 'ngrp-payments-p-01'"
+    assert gaps[0].team_networks == ["10.20.12.0/22"]
+    assert "address group 'ngrp-payments-p-01'" in gaps[0].detail
 
 
 def test_an_object_inside_its_teams_networks_is_not_reported():
