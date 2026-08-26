@@ -635,6 +635,12 @@ class InventoryGap(BaseModel):
     team_networks: list[str] = Field(
         default_factory=list, description="Every network the inventory does give that team"
     )
+    rule_count: int = Field(
+        default=0,
+        description="How many rules reach the object, directly or through a group. For "
+        "'outside-team' this is the size of what is missing from the team's report, and a "
+        "gap is reported only where it is at least one",
+    )
     team_source: str = Field(
         default="",
         description="What those networks were read from -- an address group, a tag, the "

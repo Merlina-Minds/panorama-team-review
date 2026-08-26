@@ -18,6 +18,15 @@ have papered over it: the rules would have appeared without direction, without
 matched networks, and the group would have stayed wrong for everything else
 that uses it.
 
+Reported only where a rule actually reaches the object. The whole claim of this
+gap is that rules are missing from a team's report, so an object no rule uses --
+a decommissioned range whose object outlived it, of which a large estate holds
+plenty -- hides nothing, however wrong its name is against the inventory. On the
+estate this was measured on, that is 28 of 50 rows: every one of them a stale
+object, and every one of them a reader deciding the check cries wolf. The count
+of rules behind each gap is carried with it, because "9 rules" and "1 rule" are
+not the same piece of work.
+
 Each gap names *where* the team's networks were read from -- ``Team.origin``,
 which is an address group on an estate that derives its teams, and the
 inventory file on one that writes them down. Without it the report states a
@@ -55,7 +64,7 @@ def find_inventory_gaps(
     origins = {team.id: team.origin for team in teams}
 
     claims = _collect_claims(snapshot, compiled, known)
-    return _outside_team(claims, known, origins) + _claimed_twice(claims)
+    return _outside_team(claims, known, origins, _rule_usage(snapshot)) + _claimed_twice(claims)
 
 
 class _Claim:
@@ -106,7 +115,10 @@ def _collect_claims(snapshot, compiled, known) -> list[_Claim]:
 
 
 def _outside_team(
-    claims: list[_Claim], known: dict[str, list], origins: dict[str, str]
+    claims: list[_Claim],
+    known: dict[str, list],
+    origins: dict[str, str],
+    usage: dict[str, int],
 ) -> list[InventoryGap]:
     gaps = []
     for claim in claims:
@@ -115,6 +127,14 @@ def _outside_team(
             claim.network.version == asset.version and claim.network.subnet_of(asset)
             for asset in assets
         ):
+            continue
+        rules = usage.get(claim.name, 0)
+        if not rules:
+            # Nothing reaches this object, so nothing is missing from anybody's
+            # report. The name may well be wrong against the inventory -- it
+            # usually is, on an object that outlived the range it describes --
+            # but that is a tidy-up, not a gap in a review, and a list of them
+            # buries the rows somebody has to act on.
             continue
         held = ", ".join(str(a) for a in assets[:4]) or "nothing"
         more = f" and {len(assets) - 4} more" if len(assets) > 4 else ""
@@ -127,14 +147,78 @@ def _outside_team(
                 network=str(claim.network),
                 team_networks=[str(asset) for asset in assets],
                 team_source=source,
+                rule_count=rules,
                 detail=(
                     f"the name assigns this object to {claim.team_id}, whose networks come "
-                    f"from {source} and hold {held}{more} -- so every rule touching "
-                    f"{claim.network} is missing from that team's report"
+                    f"from {source} and hold {held}{more} -- so {_rules(rules)} touching "
+                    f"{claim.network} {'is' if rules == 1 else 'are'} missing from that "
+                    "team's report"
                 ),
             )
         )
-    return sorted(gaps, key=lambda g: (g.team_id, g.network))
+    # Heaviest team first, its rows together: several gaps on one team are
+    # usually one address group to correct, and the size of what is hidden is
+    # what decides which group to correct first.
+    weight: dict[str, int] = {}
+    for gap in gaps:
+        weight[gap.team_id] = weight.get(gap.team_id, 0) + gap.rule_count
+    return sorted(gaps, key=lambda g: (-weight[g.team_id], g.team_id, g.network))
+
+
+def _rules(count: int) -> str:
+    return "1 rule" if count == 1 else f"{count} rules"
+
+
+def _rule_usage(snapshot: Snapshot) -> dict[str, int]:
+    """How many rules reach each address object, directly or through a group.
+
+    Deliberately an over-approximation. Objects are matched by name across the
+    whole configuration rather than resolved per scope, and a dynamic group
+    counts every object carrying a tag its filter names, without evaluating the
+    expression. Both err the same way -- towards *used* -- which is the safe
+    direction here: the count only ever decides whether a gap is worth showing,
+    so guessing high leaves a row in the report and guessing low would delete a
+    real one.
+    """
+    by_tag: dict[str, list[str]] = {}
+    for address in snapshot.addresses:
+        for tag in address.tags:
+            by_tag.setdefault(tag, []).append(address.name)
+
+    members: dict[str, list[str]] = {}
+    for group in snapshot.address_groups:
+        entry = members.setdefault(group.name, [])
+        entry.extend(group.members)
+        for tag in _filter_tags(group.dynamic_filter):
+            entry.extend(by_tag.get(tag, ()))
+
+    counts: dict[str, int] = {}
+    for rule in snapshot.rules:
+        reached: set[str] = set()
+        pending = [*rule.source.raw, *rule.destination.raw]
+        while pending:
+            name = pending.pop()
+            if name in reached:
+                continue
+            reached.add(name)
+            pending.extend(members.get(name, ()))
+        for name in reached:
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def _filter_tags(expression: str | None) -> list[str]:
+    """The tag names in a dynamic group's filter, e.g. ``'web' and 'prod'``."""
+    if not expression:
+        return []
+    quoted = re.findall(r"'([^']*)'", expression)
+    if quoted:
+        return quoted
+    return [
+        word
+        for word in re.split(r"[^\w.:/-]+", expression)
+        if word and word.lower() not in {"and", "or", "not"}
+    ]
 
 
 def _claimed_twice(claims: list[_Claim]) -> list[InventoryGap]:

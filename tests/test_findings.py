@@ -494,11 +494,12 @@ def test_the_finding_names_the_editor_and_the_date():
 # ---------------------------------------------------------------------------
 
 
-def _gaps(objects, teams, patterns, origins=None):
+def _gaps(objects, teams, patterns, origins=None, used=True):
     """objects: [(name, cidr)], teams: {id: [cidr]}, patterns: [(regex, team_id)].
 
     ``origins`` says where each team's networks were read from, as a derived
-    team records it -- the address group, or the inventory file."""
+    team records it -- the address group, or the inventory file. ``used`` writes
+    one rule per object, since a gap is only reported where a rule reaches it."""
     from datetime import datetime
 
     from panorama_team_review.analyze.inventory_gaps import find_inventory_gaps
@@ -507,6 +508,8 @@ def _gaps(objects, teams, patterns, origins=None):
         AddressKind,
         AddressObject,
         Location,
+        ResolvedAddresses,
+        SecurityRule,
         Snapshot,
         SnapshotMeta,
         Team,
@@ -518,6 +521,15 @@ def _gaps(objects, teams, patterns, origins=None):
         addresses=[
             AddressObject(name=name, kind=AddressKind.IP_NETMASK, value=cidr, location=location)
             for name, cidr in objects
+        ],
+        rules=[
+            SecurityRule(
+                name=f"rule-{index}",
+                location=location,
+                destination=ResolvedAddresses(raw=[name]),
+            )
+            for index, (name, _) in enumerate(objects)
+            if used
         ],
     )
     return find_inventory_gaps(
@@ -545,6 +557,48 @@ def test_an_object_outside_its_teams_networks_is_reported():
     assert gaps[0].team_id == "payments-p"
     assert gaps[0].network == "10.20.99.0/24"
     assert "10.20.12.0/22" in gaps[0].detail
+
+
+def test_an_object_no_rule_reaches_is_not_reported():
+    """The gap claims rules are missing from a report; here there are none.
+
+    A large estate holds plenty of objects that outlived the range they
+    describe. Their names disagree with the inventory and nothing follows from
+    it -- on the estate this was measured on, 28 of 50 rows were such objects,
+    which is how a check that is right teaches its reader to skip it."""
+    gaps = _gaps(
+        objects=[("net-prod-payments-database-10.20.99.0-24", "10.20.99.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+        used=False,
+    )
+    assert gaps == []
+
+
+def test_a_gap_counts_the_rules_it_hides():
+    """'9 rules' and '1 rule' are not the same piece of work."""
+    gaps = _gaps(
+        objects=[("net-prod-payments-database-10.20.99.0-24", "10.20.99.0/24")],
+        teams={"payments-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+    )
+    assert gaps[0].rule_count == 1
+    assert "1 rule touching 10.20.99.0/24 is missing" in gaps[0].detail
+
+
+def test_a_stale_object_still_counts_as_a_second_claim():
+    """The other check looks for exactly this: a range reassigned, the old
+    object left behind. Requiring a rule there would delete the finding."""
+    gaps = _gaps(
+        objects=[
+            ("net-prod-payments-database-10.20.12.0-24", "10.20.12.0/24"),
+            ("net-prod-orders-frontend-10.20.12.0-24", "10.20.12.0/24"),
+        ],
+        teams={"payments-p": ["10.20.12.0/22"], "orders-p": ["10.20.12.0/22"]},
+        patterns=[PROD],
+        used=False,
+    )
+    assert [gap.kind for gap in gaps] == ["claimed-twice"]
 
 
 def test_a_gap_names_the_object_its_teams_networks_were_read_from():
@@ -635,14 +689,18 @@ def test_an_object_defined_in_two_scopes_is_reported_once():
         AddressKind,
         AddressObject,
         Location,
+        ResolvedAddresses,
+        SecurityRule,
         Snapshot,
         SnapshotMeta,
         Team,
     )
 
+    name = "net-prod-payments-database-10.20.99.0-24"
+
     def address(scope):
         return AddressObject(
-            name="net-prod-payments-database-10.20.99.0-24",
+            name=name,
             kind=AddressKind.IP_NETMASK, value="10.20.99.0/24",
             location=Location(source="t.xml", device_group=scope),
         )
@@ -650,6 +708,12 @@ def test_an_object_defined_in_two_scopes_is_reported_once():
     snapshot = Snapshot(
         meta=SnapshotMeta(source_file="t.xml", parsed_at=datetime(2026, 7, 28)),
         addresses=[address("DG-Production"), address(None)],
+        rules=[
+            SecurityRule(
+                name="r", location=Location(source="t.xml"),
+                destination=ResolvedAddresses(raw=[name]),
+            )
+        ],
     )
     gaps = find_inventory_gaps(
         snapshot,

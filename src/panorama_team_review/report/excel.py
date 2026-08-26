@@ -647,7 +647,7 @@ def _write_inventory_gaps_sheet(
         # worklist entry, and without the source it says what is wrong without
         # saying what to edit -- on an estate deriving its teams from address
         # groups, the file to correct is not the inventory at all.
-        ("The team's networks", 34), ("Read from", 46),
+        ("The team's networks", 34), ("Read from", 46), ("Rules hidden", 13),
         ("Also claimed by", 22), ("Their object", 46), ("What it means", 70),
     ]
     for index, (header, width) in enumerate(columns):
@@ -661,6 +661,7 @@ def _write_inventory_gaps_sheet(
         values = [
             gap.kind, gap.team_id, gap.object_name, gap.network,
             ", ".join(gap.team_networks), gap.team_source,
+            gap.rule_count if gap.kind == "outside-team" else "",
             gap.other_team or "", gap.other_object or "", gap.detail,
         ]
         for column, value in enumerate(values):

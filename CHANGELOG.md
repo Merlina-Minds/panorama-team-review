@@ -171,6 +171,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **An inventory gap is reported only where a rule actually reaches the
+  object.** The check's whole claim is that rules are missing from a team's
+  report -- so an object no rule uses, directly or through a group, hides
+  nothing however wrong its name is against the inventory. A large estate holds
+  plenty of them: objects that outlived the range they describe, often tagged as
+  outdated. On the estate this was measured on they were 28 of 50 rows, which is
+  how a check that is right teaches its reader to skip it. Each remaining row
+  now carries the number of rules behind it, the section is ordered by it, and
+  the second check is untouched -- a stale object left behind by a reassigned
+  range is exactly what *A network two teams' names both claim* looks for.
+
 - **An inventory gap names the object its team's networks were read from.** The
   check reported that a name and the inventory disagree, and left the reader to
   work out what to edit -- which on an estate deriving its teams from address

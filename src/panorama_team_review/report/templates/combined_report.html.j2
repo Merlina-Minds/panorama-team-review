@@ -245,17 +245,18 @@
       <h3 class="gap-head">A network the name assigns to a team the inventory does not give it
         <span class="count-badge">{{ outside | length }}</span></h3>
       <p class="lede">
-        Usually the team's address group is missing a member. Every rule touching the network is
-        absent from that team's report until it is added — so the last column names the thing to
-        edit: the address group, or the inventory file, whichever this team's networks were read
-        from. Several rows often close with one edit, when a missing VPC brings its subnets with
-        it.
+        Usually the team's address group is missing a member. The rules touching that network are
+        absent from the team's report until it is added, and <em>Rules hidden</em> counts them —
+        an object no rule reaches is not listed here, because it hides nothing however wrong its
+        name is. <em>Read from</em> names the thing to edit: the address group, or the inventory
+        file, whichever this team's networks were read from. Several rows usually close with one
+        edit, when a missing VPC brings its subnets with it.
       </p>
       <div class="table-scroll{{ ' capped' if outside | length > 12 }}">
         <table>
           <thead><tr>
             <th>Team</th><th>Object</th><th>Network</th>
-            <th>The team's networks</th><th>Read from</th>
+            <th class="num">Rules hidden</th><th>The team's networks</th><th>Read from</th>
           </tr></thead>
           <tbody>
           {% for gap in outside %}
@@ -267,6 +268,7 @@
               </td>
               <td class="mono">{{ gap.object_name }}</td>
               <td class="addr">{{ gap.network }}</td>
+              <td class="num">{{ gap.rule_count }}</td>
               <td class="addr">
                 {{- gap.team_networks[:4] | join(", ") or "nothing" -}}
                 {%- if gap.team_networks | length > 4 %} and {{ gap.team_networks | length - 4 }} more{% endif -%}

@@ -545,7 +545,7 @@ cross-team overview and as a worksheet in the combined workbook:
 
 | | Meaning |
 |---|---|
-| **A network the name assigns to a team the inventory does not give it** | Usually the account's address group is missing a member. Every rule touching that network is absent from the team's report until it is added. The row names the address group — or the inventory file — the team's networks were read from, which is the thing to edit. |
+| **A network the name assigns to a team the inventory does not give it** | Usually the account's address group is missing a member. The rules touching that network are absent from the team's report until it is added, and the row counts them. It also names the address group — or the inventory file — the team's networks were read from, which is the thing to edit. Reported only where a rule actually reaches the object: an object nothing uses, such as one that outlived the range it describes, hides no rules however wrong its name is. |
 | **A network two teams' names both claim** | Either the range was reassigned and the older object outlived it, or both describe the same addresses. A rule touching it is attributed to both, and neither attribution is the more trustworthy. |
 
 An object whose name points at a team that does not exist is *not* reported
