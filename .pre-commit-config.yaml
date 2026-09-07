@@ -22,7 +22,7 @@ repos:
         exclude: '^(LICENSE|uv\.lock|docs/PRIVACY\.md|tools/check_no_customer_data\.py)$'
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.7
+    rev: v0.16.6
     hooks:
       - id: ruff
         args: [--fix]
@@ -32,7 +32,7 @@ repos:
         stages: [manual]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
         exclude: '^config/.*\.example\.yaml$'

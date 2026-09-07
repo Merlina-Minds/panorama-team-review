@@ -550,4 +550,3 @@ def test_collect_reports_progress(monkeypatch):
 
     assert any("collecting hit counts" in m for m in messages)
     assert any("S1" in m for m in messages)
-
