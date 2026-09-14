@@ -96,4 +96,3 @@ def _write_gzip(path: Path, text: str) -> None:
     """Write text as gzip, with the archive's own timestamp zeroed so identical
     content produces identical bytes -- a committed report does not churn."""
     path.write_bytes(gzip.compress(text.encode("utf-8"), mtime=0))
-
