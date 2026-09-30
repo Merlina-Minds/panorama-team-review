@@ -282,6 +282,34 @@ ownership:
     assert all("production" in name for name in team_reports)
 
 
+def test_run_skip_unknown_teams_writes_the_teams_that_exist(runner, estate):
+    result = runner.invoke(
+        main,
+        ["-c", str(estate / "config.yaml"), "run", "--team", "platform", "--team", "nope",
+         "--skip-unknown-teams"],
+    )
+    assert result.exit_code == EXIT_OK, result.output
+    assert "no such team, no report written: nope" in result.output
+    team_reports = [
+        p.name for p in (estate / "reports").glob("*.json.gz") if OVERVIEW_MARK not in p.name
+    ]
+    assert team_reports
+    assert all("platform" in name for name in team_reports)
+
+
+def test_run_skip_unknown_teams_is_no_error_when_no_team_exists(runner, estate):
+    # A caller asking for one team per account: an account without rules has no
+    # team, and that is a finding rather than a failure.
+    result = runner.invoke(
+        main, ["-c", str(estate / "config.yaml"), "run", "--team", "nope", "--skip-unknown-teams"]
+    )
+    assert result.exit_code == EXIT_OK, result.output
+    assert not [
+        p for p in (estate / "reports").glob("*.json.gz") if OVERVIEW_MARK not in p.name
+    ]
+    assert "check output.formats" not in result.output
+
+
 def test_run_sample_limits_the_number_of_team_reports(runner, estate):
     result = runner.invoke(
         main, ["-c", str(estate / "config.yaml"), "run", "--sample", "1"]

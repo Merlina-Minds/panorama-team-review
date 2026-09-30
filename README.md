@@ -578,8 +578,11 @@ pan-review scrub SRC DST      Pseudonymise a configuration for a bug report.
 
 Useful flags on `run`: `--backup FILE` for a manual one-off, `--team ID` to
 write only that team's reports (inventory or derived; the analysis still covers
-the whole estate), `-f FORMAT` to override output formats, `--no-network` to force
-offline operation, `--as-of DATE` to reproduce a past review date.
+the whole estate), `--skip-unknown-teams` to warn instead of fail when a `--team`
+has no such team -- for scripts asking for the teams they expect, where a team
+without rules is a finding --, `-f FORMAT` to override output formats,
+`--no-network` to force offline operation, `--as-of DATE` to reproduce a past
+review date.
 
 `--sample N` writes only N per-team reports while still analysing the whole
 estate, which is the fast way to check a configuration change without producing

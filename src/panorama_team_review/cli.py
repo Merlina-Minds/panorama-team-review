@@ -120,6 +120,12 @@ def main(ctx: click.Context, config_path: Path | None, quiet: bool, verbose: boo
 )
 @click.option("--team", "teams_filter", multiple=True, help="Only report on these team ids.")
 @click.option(
+    "--skip-unknown-teams", is_flag=True,
+    help="Warn about --team ids that no backup produced instead of failing, and write the "
+    "reports of the others. For callers that ask for the teams they expect -- one per "
+    "account, say -- where a team without any rules is a finding, not a typo.",
+)
+@click.option(
     "--sample", type=click.IntRange(min=1), metavar="N",
     help="Write only N per-team reports, picked as a spread across team size and naming "
     "families rather than the first N. For trying a configuration out without producing "
@@ -141,6 +147,7 @@ def run(
     output: Path | None,
     formats: tuple[str, ...],
     teams_filter: tuple[str, ...],
+    skip_unknown_teams: bool,
     sample: int | None,
     no_network: bool,
     as_of: datetime | None,
@@ -209,7 +216,9 @@ def run(
 
         if teams_filter:
             found = {report.team.id for bundle in bundles for report in bundle.teams}
-            if unknown := set(teams_filter) - found:
+            if (unknown := set(teams_filter) - found) and skip_unknown_teams:
+                ctx.warn(f"no such team, no report written: {', '.join(sorted(unknown))}")
+            elif unknown:
                 click.echo(f"error: unknown team ids: {', '.join(sorted(unknown))}", err=True)
                 sys.exit(EXIT_CONFIG)
 
@@ -228,6 +237,8 @@ def run(
         ctx.say(f"Wrote {len(written)} file(s) to {written[0].parent}")
         for path in written if ctx.verbose else []:
             ctx.detail(str(path))
+    elif teams_filter and not any(bundle.teams for bundle in bundles):
+        ctx.say("None of the teams asked for exists, so there was nothing to write")
     else:
         ctx.warn("nothing was written -- check output.formats in the configuration")
 

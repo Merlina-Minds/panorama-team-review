@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`run --skip-unknown-teams` for callers that ask for the teams they expect.**
+  A script that turns its own list -- one team per account, say -- into `--team`
+  arguments cannot know which of them the firewall has any rules for, and a team
+  without rules is a finding, not a typo. With the flag, a `--team` that no
+  backup produced is a warning, the reports of the others are written, and the
+  run succeeds even when none of them exists. Without it, an unknown id still
+  fails the run and writes nothing.
+
 - **The overview answers "which team owns this network?".** A ticket arrives
   with an address in it, and the only way to turn that into an owner was to read
   a table of every team. The cross-team overview now takes an address or a CIDR
