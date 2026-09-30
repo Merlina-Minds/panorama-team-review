@@ -187,6 +187,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Firewalls that last matched on the same day are listed busiest first.** The
+  per-firewall hit breakdown still puts the most recent match on top, but it
+  compared exact timestamps the report never shows, so two firewalls both marked
+  "last 2026-07-20" came out in the order of a time of day nobody could see. A
+  match now counts by its day; within a day the firewall with the most hits
+  comes first, and equal counts go by firewall name. This holds in the HTML and
+  PDF reports, in the Excel note and in the JSON.
+
 - **An inventory gap is reported only where a rule actually reaches the
   object.** The check's whole claim is that rules are missing from a team's
   report -- so an object no rule uses, directly or through a group, hides

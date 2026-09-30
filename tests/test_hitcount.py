@@ -378,6 +378,41 @@ def test_device_group_rule_sums_its_firewalls_hits():
     assert [d.device for d in rule.hits.per_device] == ["fw2", "fw1"]
 
 
+def test_breakdown_orders_a_days_matches_by_hits_then_name():
+    """Newest day first and never-matched last; the time within a day is not
+    shown, so it does not decide -- most hits do, and a tie goes alphabetically."""
+    rule = SecurityRule(
+        name="allow-web", location=Location(source="t", device_group="DG", rulebase=Rulebase.PRE)
+    )
+    serials = ["S1", "S2", "S3", "S4", "S5", "S6"]
+    snapshot = _snapshot(
+        [rule],
+        device_groups={"DG": DeviceGroup(name="DG", devices=serials)},
+        devices=[
+            ManagedDevice(serial="S1", hostname="fw-c", device_group="DG"),
+            ManagedDevice(serial="S2", hostname="fw-a", device_group="DG"),
+            ManagedDevice(serial="S3", hostname="FW-B", device_group="DG"),
+            ManagedDevice(serial="S4", hostname="fw-d", device_group="DG"),
+            ManagedDevice(serial="S5", hostname="fw-e", device_group="DG"),
+            ManagedDevice(serial="S6", hostname="fw-f", device_group="DG"),
+        ],
+    )
+    counters = dict(
+        [
+            _device_counter("S1", "allow-web", hit_count=5, last_hit=datetime(2026, 7, 20, 17)),
+            _device_counter("S2", "allow-web", hit_count=5, last_hit=datetime(2026, 7, 20, 8)),
+            _device_counter("S3", "allow-web", hit_count=5, last_hit=datetime(2026, 7, 20, 12)),
+            _device_counter("S4", "allow-web", hit_count=9, last_hit=datetime(2026, 7, 20, 6)),
+            _device_counter("S5", "allow-web", hit_count=1, last_hit=datetime(2026, 7, 25, 9)),
+            _device_counter("S6", "allow-web", hit_count=0),
+        ]
+    )
+
+    hitcount._apply(snapshot.rules, counters, snapshot)
+    assert rule.hits is not None
+    assert [d.device for d in rule.hits.per_device] == ["fw-e", "fw-d", "fw-a", "FW-B", "fw-c", "fw-f"]
+
+
 def test_parent_device_group_rule_reaches_child_firewalls():
     """A pre-rule in a parent DG is pushed to firewalls in child DGs too."""
     rule = SecurityRule(

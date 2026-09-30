@@ -227,8 +227,11 @@ def _aggregate(
         )
         for serial, hit in contributions
     ]
-    # Newest first; firewalls that never matched sort last.
-    per_device.sort(key=lambda d: (d.last_hit is not None, d.last_hit), reverse=True)
+    # Newest first -- by day, the precision the report shows -- and firewalls that
+    # never matched last; within a day, most hits first, then by firewall name.
+    per_device.sort(
+        key=lambda d: (-d.last_hit.toordinal() if d.last_hit else 0, -d.hit_count, d.device.lower())
+    )
 
     return HitCount(
         hit_count=sum(hit.hit_count for _, hit in contributions),
