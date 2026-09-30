@@ -13,10 +13,14 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # To start CI on the pull request; see "Run CI on the pull request".
+  actions: write
 
 jobs:
   autoupdate:
     runs-on: ubuntu-latest
+    env:
+      BRANCH: chore/pre-commit-autoupdate
     steps:
       - uses: actions/checkout@v7
 
@@ -31,21 +35,44 @@ jobs:
 
       - name: Verify the hooks still run
         # An update that breaks the customer-data guard must not reach a PR
-        # looking green.
+        # looking green. The PR is still opened, so the breakage is seen, but
+        # its description says so and this run fails at the end.
+        id: verify
         run: pre-commit run --all-files
         continue-on-error: true
 
       - uses: peter-evans/create-pull-request@v8
+        id: pr
         with:
           commit-message: "ci: bump pre-commit hook revisions"
-          branch: chore/pre-commit-autoupdate
+          branch: ${{ env.BRANCH }}
           delete-branch: true
           title: "ci: bump pre-commit hook revisions"
           body: |
             Automated `pre-commit autoupdate`.
+
+            ${{ steps.verify.outcome == 'success' && 'All hooks pass on the whole tree with these revisions.' || format('**The hooks fail on the whole tree with these revisions** -- see {0}/{1}/actions/runs/{2}.', github.server_url, github.repository, github.run_id) }}
 
             Check the CI run before merging -- a new ruff release can introduce
             lint rules that fail the build.
           labels: |
             dependencies
             ci
+
+      - name: Run CI on the pull request
+        # A push or pull request made with the workflow's own token starts no
+        # workflows -- GitHub's guard against runs triggering runs -- so the PR
+        # would otherwise sit there with no checks at all. workflow_dispatch is
+        # the documented exception, and ci.yml accepts it.
+        if: >-
+          steps.pr.outputs.pull-request-operation == 'created' ||
+          steps.pr.outputs.pull-request-operation == 'updated'
+        run: gh workflow run ci.yml --ref "$BRANCH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Fail if the hooks did not pass
+        if: steps.verify.outcome == 'failure'
+        run: |
+          echo "::error::pre-commit run --all-files fails with the updated revisions"
+          exit 1

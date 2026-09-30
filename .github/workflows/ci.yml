@@ -19,6 +19,9 @@ jobs:
   data-guard:
     name: No customer data
     runs-on: ubuntu-latest
+    # Every job here finishes in a couple of minutes. Without a limit, a hung
+    # apt mirror holds the run for GitHub's default of six hours.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -33,6 +36,7 @@ jobs:
   test:
     name: Tests (Python ${{ matrix.python }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +114,7 @@ jobs:
   lint:
     name: Lint and types
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -127,6 +132,7 @@ jobs:
   end-to-end:
     name: End-to-end run
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7

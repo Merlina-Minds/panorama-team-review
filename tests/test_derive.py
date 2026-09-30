@@ -587,4 +587,3 @@ def test_object_tags_extend_a_hand_written_inventory():
     payments = next(report for report in bundle.teams if report.team.id == "payments")
     assert payments.team.name == "Payments"  # the explicit entry still wins
     assert set(payments.team.assets) == {"10.99.0.0/16", "10.20.0.0/24"}
-

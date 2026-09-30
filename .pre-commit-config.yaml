@@ -41,7 +41,13 @@ repos:
         args: [--maxkb=512]
       - id: check-merge-conflict
       - id: detect-private-key
+        # The scrubber's own test writes a key header on purpose. The
+        # customer-data guard above still checks that file line by line.
+        exclude: '^tests/test_privacy\.py$'
       - id: end-of-file-fixer
+        # The example reports are the tool's output byte for byte; a hook that
+        # rewrites them makes them differ from what a run actually produces.
+        exclude: '^example/reports/'
       - id: trailing-whitespace
         exclude: '\.md$'
       - id: mixed-line-ending

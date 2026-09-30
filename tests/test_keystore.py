@@ -22,6 +22,10 @@ from panorama_team_review.errors import EnrichmentError
 
 KEYGEN_XML = b'<response status="success"><result><key>GENERATED-KEY</key></result></response>'
 
+# Windows has no group/other mode bits -- os.chmod there only toggles the
+# read-only flag -- which is why keystore.load() checks them on POSIX alone.
+posix_modes = pytest.mark.skipif(os.name != "posix", reason="POSIX file modes only")
+
 
 class FakeResponse:
     def __init__(self, content: bytes) -> None:
@@ -65,6 +69,7 @@ def test_a_stored_session_is_read_back():
     assert session.key_for("fw.example.com", None) == "KEY-1"
 
 
+@posix_modes
 def test_the_session_file_is_private():
     keystore.store("readonly-api", {"fw.example.com": "KEY-1"})
     path = keystore.session_path()
@@ -73,6 +78,7 @@ def test_the_session_file_is_private():
     assert path.parent.stat().st_mode & 0o077 == 0
 
 
+@posix_modes
 def test_a_session_readable_by_others_is_refused():
     keystore.store("readonly-api", {"fw.example.com": "KEY-1"})
     path = keystore.session_path()
