@@ -577,7 +577,8 @@ pan-review scrub SRC DST      Pseudonymise a configuration for a bug report.
 ```
 
 Useful flags on `run`: `--backup FILE` for a manual one-off, `--team ID` to
-limit the run, `-f FORMAT` to override output formats, `--no-network` to force
+write only that team's reports (inventory or derived; the analysis still covers
+the whole estate), `-f FORMAT` to override output formats, `--no-network` to force
 offline operation, `--as-of DATE` to reproduce a past review date.
 
 `--sample N` writes only N per-team reports while still analysing the whole

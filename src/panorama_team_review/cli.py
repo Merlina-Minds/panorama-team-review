@@ -170,14 +170,6 @@ def run(
         click.echo(f"error: {exc}", err=True)
         sys.exit(EXIT_CONFIG)
 
-    if teams_filter:
-        wanted = set(teams_filter)
-        unknown = wanted - {team.id for team in teams}
-        if unknown:
-            click.echo(f"error: unknown team ids: {', '.join(sorted(unknown))}", err=True)
-            sys.exit(EXIT_CONFIG)
-        teams = [team for team in teams if team.id in wanted]
-
     if not teams and not config.ownership.derive_teams:
         ctx.warn(
             "no teams configured -- every rule will end up in the 'unassigned' section. "
@@ -190,8 +182,14 @@ def run(
             "derive_teams rule(s)"
         )
 
+    # --team picks the reports to write, not the teams to analyse. Cutting the
+    # inventory down first would change ownership for the same reason --sample
+    # does not (see _write_outputs), and it cannot see the teams derive_teams
+    # adds from the backup at all. So every backup is analysed in full first, and
+    # an id is only unknown when no backup produced that team.
     written: list[Path] = []
     try:
+        bundles: list[ReportBundle] = []
         for path in backups:
             ctx.say(f"Reading {path.name}")
             snapshot = _load_snapshot(ctx, path)
@@ -205,7 +203,17 @@ def run(
                 snapshot, teams, config, today=as_of.date() if as_of else date.today()
             )
             bundle.notes.extend(notes)
+            if teams_filter:
+                bundle.teams = [report for report in bundle.teams if report.team.id in teams_filter]
+            bundles.append(bundle)
 
+        if teams_filter:
+            found = {report.team.id for bundle in bundles for report in bundle.teams}
+            if unknown := set(teams_filter) - found:
+                click.echo(f"error: unknown team ids: {', '.join(sorted(unknown))}", err=True)
+                sys.exit(EXIT_CONFIG)
+
+        for bundle in bundles:
             written.extend(_write_outputs(ctx, bundle, sample))
     except PanReviewError as exc:
         click.echo(f"error: {exc}", err=True)

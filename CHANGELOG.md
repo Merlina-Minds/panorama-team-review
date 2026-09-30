@@ -111,6 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`run --team` now finds teams that `derive_teams` creates.** The filter was
+  checked against the inventory file alone, before the backup was read, so every
+  derived team was an "unknown team id" -- with an empty inventory, every id was.
+  It also cut the inventory down before the analysis, which changed ownership
+  the way `--sample` is careful not to, and the derived teams were added back
+  afterwards anyway. `--team` now works like `--sample`: the whole estate is
+  analysed, only the named teams' reports are written, and an id is unknown only
+  when no backup produced that team. As before, an unknown id writes nothing.
 - **The JSON report now separates a team's own rules from the ones that merely
   cover them.** `inbound`, `outbound`, `internal` and `related` held both kinds
   mixed together, told apart only by each entry's `coverage` field, while the

@@ -257,6 +257,31 @@ def test_run_team_filter(runner, estate):
     assert not any("payments" in name for name in names)
 
 
+def test_run_team_filter_finds_a_team_derived_from_the_backup(runner, estate):
+    # The inventory knows platform and payments. 'production' only exists once
+    # derive_teams has read the address groups of the backup.
+    config = estate / "config.yaml"
+    config.write_text(
+        config.read_text(encoding="utf-8")
+        + """
+ownership:
+  derive_teams:
+    - id: groups
+      source: address-group
+      pattern: '^grp-(?P<team>[a-z-]+)-app$'
+      team_id: "{team}"
+""",
+        encoding="utf-8",
+    )
+    result = runner.invoke(main, ["-c", str(config), "run", "--team", "production"])
+    assert result.exit_code == EXIT_OK, result.output
+    team_reports = [
+        p.name for p in (estate / "reports").glob("*.json.gz") if OVERVIEW_MARK not in p.name
+    ]
+    assert team_reports
+    assert all("production" in name for name in team_reports)
+
+
 def test_run_sample_limits_the_number_of_team_reports(runner, estate):
     result = runner.invoke(
         main, ["-c", str(estate / "config.yaml"), "run", "--sample", "1"]
@@ -361,6 +386,7 @@ def test_run_unknown_team_filter_exits_config(runner, estate):
     )
     assert result.exit_code == EXIT_CONFIG
     assert "unknown team ids" in result.output
+    assert not list((estate / "reports").glob("*"))  # nothing written for the known teams either
 
 
 def test_run_as_of_changes_expiry_evaluation(runner, estate):
